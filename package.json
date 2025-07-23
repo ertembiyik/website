@@ -1,14 +1,21 @@
 {
-  "name": "ertembiyik-site",
-  "type": "module",
-  "version": "0.0.1",
-  "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
-    "astro": "astro"
-  },
-  "dependencies": {
-    "astro": "^5.12.2"
-  }
+	"name": "ertembiyik-site",
+	"type": "module",
+	"version": "0.0.1",
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro build",
+		"preview": "astro build && wrangler pages dev",
+		"astro": "astro",
+		"deploy": "astro build && wrangler pages deploy",
+		"cf-typegen": "wrangler types"
+	},
+	"dependencies": {
+		"@astrojs/cloudflare": "^12.6.0",
+		"astro": "^5.12.2"
+	},
+	"devDependencies": {
+		"@types/node": "^24.1.0",
+		"wrangler": "^4.25.1"
+	}
 }

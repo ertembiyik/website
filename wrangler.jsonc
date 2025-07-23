@@ -5,11 +5,16 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "ertembiyik-site",
+	"main": "./dist/_worker.js/index.js",
 	"compatibility_date": "2025-07-23",
 	"compatibility_flags": [
-		"nodejs_compat"
+		"nodejs_compat",
+		"global_fetch_strictly_public"
 	],
-	"pages_build_output_dir": "./dist",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": "./dist"
+	},
 	"observability": {
 		"enabled": true
 	}

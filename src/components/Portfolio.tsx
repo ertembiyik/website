@@ -6,6 +6,9 @@ import TimelineSection from './timeline/TimelineSection';
 import SectionDivider from './ui/SectionDivider';
 import Spacer from './ui/Spacer';
 
+// Import polyfills for Cloudflare Workers compatibility
+import '../polyfills';
+
 import { useIsMobile } from '../hooks/use-is-mobile';
 
 import { personalInfo } from '../data/personalInfo';

@@ -1,17 +1,18 @@
 // @ts-check
 import { defineConfig } from "astro/config";
 
-import cloudflare from "@astrojs/cloudflare";
 import react from "@astrojs/react";
+
+// Import polyfills for client-side compatibility
+import "./src/polyfills/index.ts";
 
 // https://astro.build/config
 export default defineConfig({
-  adapter: cloudflare({
-    platformProxy: {
-      enabled: true,
-    },
-
-    imageService: "cloudflare",
-  }),
+  output: 'static',
   integrations: [react()],
+  vite: {
+    build: {
+      target: 'es2020'
+    }
+  },
 });

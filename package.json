@@ -1,7 +1,7 @@
 {
-  "name": "cvfolio",
+  "name": "ertembiyik-site",
   "type": "module",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
@@ -9,20 +9,18 @@
     "astro": "astro"
   },
   "dependencies": {
+    "@astrojs/cloudflare": "^12.6.5",
     "@astrojs/mdx": "4.3.4",
     "@astrojs/react": "4.3.0",
     "@astrojs/sitemap": "3.5.0",
     "@tailwindcss/typography": "^0.5.16",
-    "@tailwindcss/vite": "^4.1.10",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "astro": "5.13.2",
-    "lucide-react": "^0.519.0",
+    "@tailwindcss/vite": "^4.1.12",
+    "@types/react": "^19.1.11",
+    "@types/react-dom": "^19.1.7",
+    "astro": "5.13.3",
     "marked": "^16.2.0",
-    "mdast-util-to-string": "^4.0.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "reading-time": "^1.5.0",
-    "tailwindcss": "^4.1.10"
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tailwindcss": "^4.1.12"
   }
 }

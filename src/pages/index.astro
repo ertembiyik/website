@@ -1,6 +1,6 @@
 ---
 import { getEntry, getCollection, render } from 'astro:content';
-import BaseLayout from '@/layouts/BaseLayout.astro';
+import Layout from '@/layouts/Layout.astro';
 import Container from '@/components/Container.astro';
 import Author from '@/components/ui/Author.astro';
 import { DEFAULT_CONFIGURATION } from '@/lib/constants';
@@ -25,7 +25,7 @@ const sortedSideProjects = sortSideProjectsByDate(sideProjects);
 const talks = await getCollection('talks');
 ---
 
-<BaseLayout seo={entry.data.seo}>
+<Layout seo={entry.data.seo}>
   <Container as="section" class="py-6">
     <Author {...DEFAULT_CONFIGURATION.author} />
   </Container>
@@ -122,4 +122,4 @@ const talks = await getCollection('talks');
       </Container>
     )
   }
-</BaseLayout>
+</Layout>

@@ -6,7 +6,7 @@ import type { AuthorInfo } from '@/lib/constants';
 interface Props extends AuthorInfo {}
 const { avatar, name, headline} = Astro.props;
 
-const image = await getImage({ src: avatar, format: 'avif'});
+const image = await getImage({ src: avatar, format: 'jpeg'});
 ---
 
 <div class="flex items-center gap-4">

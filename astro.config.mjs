@@ -1,23 +1,15 @@
 // @ts-check
 import { defineConfig } from 'astro/config';
-import tailwindcss from '@tailwindcss/vite';
 import react from '@astrojs/react';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
-import { remarkReadingTime } from './src/lib/remark.mjs';
+import cloudflare from '@astrojs/cloudflare';
 
-// https://astro.build/config
+import tailwindcss from '@tailwindcss/vite';
+
 export default defineConfig({
   site: 'https://ertembiyik.com',
-  markdown: {
-    remarkPlugins: [remarkReadingTime],
-    shikiConfig: {
-      theme: 'gruvbox-dark-medium',
-    },
-  },
-  vite: {
-    plugins: [tailwindcss()],
-  },
+
   integrations: [
     react(),
     sitemap(),
@@ -26,6 +18,7 @@ export default defineConfig({
       syntaxHighlight: 'shiki',
     }),
   ],
+
   experimental: {
     fonts: [
       {
@@ -73,5 +66,9 @@ export default defineConfig({
         ],
       },
     ],
+  },
+  adapter: cloudflare(),
+  vite: {
+    plugins: [tailwindcss()],
   },
 });

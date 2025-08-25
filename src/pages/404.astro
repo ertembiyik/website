@@ -1,12 +1,12 @@
 ---
 import { getEntry } from 'astro:content';
-import BaseLayout from '@/layouts/BaseLayout.astro';
+import Layout from '@/layouts/Layout.astro';
 import Container from '@/components/Container.astro';
 
 const entry = await getEntry('pages', '404');
 ---
 
-<BaseLayout seo={entry?.data.seo}>
+<Layout seo={entry?.data.seo}>
   <Container
     as="section"
     class="min-h-[calc(100vh-12rem)] flex items-center justify-center"
@@ -77,4 +77,4 @@ const entry = await getEntry('pages', '404');
       </p>
     </div>
   </Container>
-</BaseLayout>
+</Layout>

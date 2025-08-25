@@ -1,9 +1,11 @@
 import styles from "./page.module.css";
 import Profile from "./Profile";
-import { loadCV } from "@/lib/mdx-loader";
+import { loadCVSync } from "@/lib/static-data-loader";
+
+export const dynamic = 'force-static';
 
 export default function Home() {
-  const cv = loadCV();
+  const cv = loadCVSync();
 
   return (
     <div className={styles.page}>

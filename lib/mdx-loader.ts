@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import path from 'node:path';
 import matter from 'gray-matter';
 
 const CONTENT_PATH = path.join(process.cwd(), 'public', 'content', 'sections');
@@ -80,8 +80,8 @@ export interface EducationData {
   content: string;
 }
 
-function loadMDXFile<T extends Record<string, any>>(filePath: string): T & { id: string; content: string } {
-  const fileContent = fs.readFileSync(filePath, 'utf-8');
+async function loadMDXFile<T extends Record<string, any>>(filePath: string): Promise<T & { id: string; content: string }> {
+  const fileContent = await readFile(filePath, 'utf-8');
   const { data, content } = matter(fileContent);
   const id = path.basename(filePath, '.mdx');
 
@@ -92,66 +92,89 @@ function loadMDXFile<T extends Record<string, any>>(filePath: string): T & { id:
   } as T & { id: string; content: string };
 }
 
-function loadMDXFilesFromDirectory<T extends Record<string, any>>(dirPath: string): (T & { id: string; content: string })[] {
-  if (!fs.existsSync(dirPath)) {
+async function loadMDXFilesFromDirectory<T extends Record<string, any>>(dirPath: string): Promise<(T & { id: string; content: string })[]> {
+  try {
+    await stat(dirPath);
+  } catch {
     return [];
   }
 
-  const files = fs.readdirSync(dirPath)
-    .filter(file => file.endsWith('.mdx'))
-    .filter(file => !file.startsWith('.'));
+  const files = await readdir(dirPath);
+  const mdxFiles = files
+    .filter((file: string) => file.endsWith('.mdx'))
+    .filter((file: string) => !file.startsWith('.'));
 
-  return files.map(file => {
+  const loadPromises = mdxFiles.map((file: string) => {
     const filePath = path.join(dirPath, file);
     return loadMDXFile<T>(filePath);
   });
+
+  return Promise.all(loadPromises);
 }
 
-function loadMDXLinksFromDirectory(dirPath: string): LinkData[] {
-  if (!fs.existsSync(dirPath)) {
+async function loadMDXLinksFromDirectory(dirPath: string): Promise<LinkData[]> {
+  try {
+    await stat(dirPath);
+  } catch {
     return [];
   }
 
-  const files = fs.readdirSync(dirPath)
-    .filter(file => file.endsWith('.mdx'))
-    .filter(file => !file.startsWith('.'));
+  const files = await readdir(dirPath);
+  const mdxFiles = files
+    .filter((file: string) => file.endsWith('.mdx'))
+    .filter((file: string) => !file.startsWith('.'));
 
-  return files.map(file => {
+  const loadPromises = mdxFiles.map(async (file: string) => {
     const filePath = path.join(dirPath, file);
-    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    const fileContent = await readFile(filePath, 'utf-8');
     const { data } = matter(fileContent);
     return data as LinkData;
   });
+
+  return Promise.all(loadPromises);
 }
 
-export function loadGeneralData(): GeneralData {
+export async function loadGeneralData(): Promise<GeneralData> {
   const generalPath = path.join(CONTENT_PATH, 'general.mdx');
 
-  const { data } = matter(fs.readFileSync(generalPath, 'utf-8'));
-  return data as GeneralData;
+  try {
+    const fileContent = await readFile(generalPath, 'utf-8');
+    const { data } = matter(fileContent);
+    
+    if (!data || !data.profilePhoto) {
+      console.error('Invalid general data structure:', data);
+      throw new Error('Missing required fields in general.mdx');
+    }
+    
+    return data as GeneralData;
+  } catch (error) {
+    console.error('Failed to load general data from:', generalPath);
+    console.error('Error:', error);
+    throw error;
+  }
 }
 
-export function loadJobs(): JobData[] {
+export async function loadJobs(): Promise<JobData[]> {
   const jobsPath = path.join(CONTENT_PATH, 'jobs');
   return loadMDXFilesFromDirectory<JobData>(jobsPath);
 }
 
-export function loadSideProjects(): SideProjectData[] {
+export async function loadSideProjects(): Promise<SideProjectData[]> {
   const projectsPath = path.join(CONTENT_PATH, 'side-projects');
   return loadMDXFilesFromDirectory<SideProjectData>(projectsPath);
 }
 
-export function loadTalks(): TalkData[] {
+export async function loadTalks(): Promise<TalkData[]> {
   const talksPath = path.join(CONTENT_PATH, 'talks');
   return loadMDXFilesFromDirectory<TalkData>(talksPath);
 }
 
-export function loadLinks(): LinkData[] {
+export async function loadLinks(): Promise<LinkData[]> {
   const linksPath = path.join(CONTENT_PATH, 'links');
   return loadMDXLinksFromDirectory(linksPath);
 }
 
-export function loadEducation(): EducationData[] {
+export async function loadEducation(): Promise<EducationData[]> {
   const educationPath = path.join(CONTENT_PATH, 'education');
   return loadMDXFilesFromDirectory<EducationData>(educationPath);
 }
@@ -181,17 +204,19 @@ export interface ProfileData {
 let cachedData: ProfileData | null = null;
 
 // Convert MDX data to the format expected by the application
-export function loadCV(): ProfileData {
+export async function loadCV(): Promise<ProfileData> {
   if (cachedData) {
     return cachedData;
   }
 
   try {
-    const general = loadGeneralData();
-    const jobs = loadJobs();
-    const sideProjects = loadSideProjects();
-    const talks = loadTalks();
-    const links = loadLinks();
+    const [general, jobs, sideProjects, talks, links] = await Promise.all([
+      loadGeneralData(),
+      loadJobs(),
+      loadSideProjects(),
+      loadTalks(),
+      loadLinks()
+    ]);
 
     const workExperience = jobs.map(job => ({
       id: job.id,

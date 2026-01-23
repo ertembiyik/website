@@ -1,0 +1,14 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Profile from '../components/Profile';
+import cvData from '../../public/data/cv.json';
+import pageStyles from '../styles/page.module.css';
+
+const cv = cvData;
+---
+
+<Layout title={cv.general.displayName} description={cv.general.byline}>
+  <div class={pageStyles.page}>
+    <Profile cv={cv} client:load />
+  </div>
+</Layout>

@@ -1,16 +1,7 @@
 {
-    "$schema": "node_modules/wrangler/config-schema.json",
-    "main": ".open-next/worker.js",
-    "name": "ertembiyik-site",
-    "compatibility_date": "2025-08-24",
-    "compatibility_flags": [
-        "nodejs_compat"
-    ],
-    "observability": {
-        "enabled": true
-    },
-    "assets": {
-        "binding": "ASSETS",
-        "directory": ".open-next/assets"
-    }
+  "name": "ertembiyik-site",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./dist"
+  }
 }

@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+'use client';
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import useResizeObserver from "use-resize-observer";
 import ReactDOM from 'react-dom';
 import isMobile from './isMobile';
@@ -17,6 +19,7 @@ const Lightbox: React.FC<LightboxProps> = ({
 }) => {
   const [currentIndex, setCurrentIndex] = useState(startingIndex);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const shouldReduceMotion = useReducedMotion();
 
   useEffect(() => {
     if (scrollRef.current && isMobile() && startingIndex > 0) {
@@ -32,29 +35,7 @@ const Lightbox: React.FC<LightboxProps> = ({
     };
   }, []);
 
-  const handleKey = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      close();
-    }
-    
-    if (event.key === "ArrowRight") {
-      next();
-    }
-    
-    if (event.key === "ArrowLeft") {
-      prev();
-    }
-  };
-  
-  useEffect(() => {
-    window.addEventListener('keydown', handleKey);
-
-    return () => {
-      window.removeEventListener('keydown', handleKey);
-    };
-  }, []);
-
-  const next = () => {
+  const next = useCallback(() => {
     setCurrentIndex(currentIndex => {
       if (currentIndex < attachments.length - 1) {
         return currentIndex + 1;
@@ -62,9 +43,9 @@ const Lightbox: React.FC<LightboxProps> = ({
         return 0;
       }
     });
-  }
-    
-  const prev = () => {
+  }, [attachments.length]);
+
+  const prev = useCallback(() => {
     setCurrentIndex(currentIndex => {
       if (currentIndex === 0) {
         return attachments.length - 1;
@@ -72,7 +53,29 @@ const Lightbox: React.FC<LightboxProps> = ({
         return currentIndex - 1;
       }
     });
-  }
+  }, [attachments.length]);
+
+  const handleKey = useCallback((event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      close();
+    }
+
+    if (event.key === "ArrowRight") {
+      next();
+    }
+
+    if (event.key === "ArrowLeft") {
+      prev();
+    }
+  }, [close, next, prev]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKey);
+
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+    };
+  }, [handleKey]);
 
   const handleScroll = (event: React.UIEvent<HTMLElement>) => {
     if (!attachments) { return }
@@ -152,17 +155,12 @@ const Lightbox: React.FC<LightboxProps> = ({
         className={styles.backdrop}
         onClick={() => close()}/>
       <motion.button
-        initial={{ 
-          opacity: 0,
-        }}
-        animate={{
-          opacity: 1,
-        }}
-        exit={{
-          opacity: 0,
-        }}
-        whileTap={{ scale: 0.9 }}
-        transition={{
+        aria-label="Close lightbox"
+        initial={shouldReduceMotion ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={shouldReduceMotion ? undefined : { opacity: 0 }}
+        whileTap={shouldReduceMotion ? undefined : { scale: 0.9 }}
+        transition={shouldReduceMotion ? { duration: 0 } : {
           type: 'spring',
           stiffness: 700,
           damping: 50,
@@ -186,14 +184,21 @@ const LightboxImage: React.FC<LightboxImageProps> = ({
   display,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerAspectRatio, setContainerAspectRatio] = useState((window.innerWidth - 48) / (window.innerHeight - 96));
+  const [containerAspectRatio, setContainerAspectRatio] = useState(() => {
+    if (typeof window === 'undefined') return 16 / 9;
+    return (window.innerWidth - 48) / (window.innerHeight - 96);
+  });
   const imageAspectRatio = media.width / media.height;
   
+  const prefersReducedMotion = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   let attachment = media.type === "image" ?
-    <img src={media.url}/> :
+    <img src={media.url} alt="" /> :
     <video
       src={media.url}
-      autoPlay
+      autoPlay={!prefersReducedMotion}
+      controls={prefersReducedMotion}
       muted
       playsInline
       loop/>
@@ -245,8 +250,8 @@ const LightboxImage: React.FC<LightboxImageProps> = ({
           {prev && next && !isMobile() ?
             <div
               className={styles.navigation}>
-              <button className={styles.prev} onClick={() => prev()} />
-              <button className={styles.next} onClick={() => next()} />
+              <button aria-label="Previous image" className={styles.prev} onClick={() => prev()} />
+              <button aria-label="Next image" className={styles.next} onClick={() => next()} />
             </div>
           : null}
           {attachment}

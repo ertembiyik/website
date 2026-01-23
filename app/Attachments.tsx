@@ -2,13 +2,20 @@
 
 import { useRef, useState, useCallback } from "react";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import Scrollbar from "./Scrollbar";
 import Lightbox from "./Lightbox";
-import { AnimatePresence } from "framer-motion";
 import { useScrollBoost } from 'react-scrollbooster';
 import isMobile from "./isMobile";
 import useResizeObserver from "use-resize-observer";
 import styles from "./Attachments.module.css";
+
+const AnimatePresence = dynamic(
+  () => import('framer-motion').then(m => m.AnimatePresence),
+  { ssr: false }
+);
+
+const CLOSED_LIGHTBOX = { open: false as boolean, startingIndex: 0 };
 
 type AttachmentsProps = {
   attachments: Array<any>,
@@ -16,11 +23,7 @@ type AttachmentsProps = {
 const Attachments: React.FC<AttachmentsProps> = ({
   attachments
 }) => {
-  const [lightboxState, setLightboxState] = useState({
-    open: false,
-    startingIndex: 0,
-  });
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const [lightboxState, setLightboxState] = useState(CLOSED_LIGHTBOX);
   const innerRef = useRef<HTMLDivElement>(null);
   const galleryHeight = 90;
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -63,10 +66,7 @@ const Attachments: React.FC<AttachmentsProps> = ({
     lightbox = <Lightbox
         attachments={attachments}
         startingIndex={lightboxState.startingIndex}        
-        close={() => setLightboxState({
-          open: false,
-          startingIndex: 0,
-        })}
+        close={() => setLightboxState(CLOSED_LIGHTBOX)}
       />
   }
 
@@ -95,7 +95,7 @@ const Attachments: React.FC<AttachmentsProps> = ({
           </div>
         </div>
       </div>
-      <Scrollbar scrollview={containerRef} innerChild={scrollRef} inlineStyle={{ marginTop: 8 }}/>
+      <Scrollbar scrollview={containerRef} innerChild={innerRef} inlineStyle={{ marginTop: 8 }}/>
       <AnimatePresence>
         {lightbox}
       </AnimatePresence>
@@ -126,11 +126,14 @@ const Attachment: React.FC<AttachmentProps> = ({
     }
   }
 
+  const prefersReducedMotion = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   let item;
   if (media.type === "image") {
     item = <Image alt="" src={media.url} height={height} width={height * returnThumbnailAspectRatio(media.width / media.height)} />
   } else if (media.type === "video") {
-    item = <video src={media.url} autoPlay loop muted playsInline/>
+    item = <video src={media.url} autoPlay={!prefersReducedMotion} loop muted playsInline/>
   }
 
   return (

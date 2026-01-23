@@ -69,7 +69,6 @@
       "heading": "CoreImage",
       "url": "https://www.youtube.com/watch?v=WytO_dmqr7s",
       "event": "VK x Coffee&Code",
-      "location": "Saint-Petersburg",
       "description": "How we went from custom Accelerate based image filters to Metal and CoreImage\n\nPublications: [YouTube](https://www.youtube.com/watch?v=WytO_dmqr7s)",
       "type": "talk"
     }
@@ -364,7 +363,6 @@
           "heading": "CoreImage",
           "url": "https://www.youtube.com/watch?v=WytO_dmqr7s",
           "event": "VK x Coffee&Code",
-          "location": "Saint-Petersburg",
           "description": "How we went from custom Accelerate based image filters to Metal and CoreImage\n\nPublications: [YouTube](https://www.youtube.com/watch?v=WytO_dmqr7s)",
           "type": "talk"
         }

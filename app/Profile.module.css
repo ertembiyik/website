@@ -99,8 +99,10 @@
   white-space: nowrap;
 }
 
-.title a:hover {
-  border-bottom: 1px solid;
+@media (hover: hover) and (pointer: fine) {
+  .title a:hover {
+    border-bottom: 1px solid;
+  }
 }
 
 .linkArrow {

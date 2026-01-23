@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect, useRef } from 'react';
 import useResizeObserver from "use-resize-observer";
 import styles from './Scrollbar.module.css';
@@ -24,7 +26,7 @@ const Scrollbar: React.FC<ScrollbarProps> = ({
       setRenderCount(count => count + 1)
     }
     onResize();
-    view.addEventListener('scroll', onScroll);
+    view.addEventListener('scroll', onScroll, { passive: true });
     return () => view.removeEventListener('scroll', onScroll);
   }, []);
 

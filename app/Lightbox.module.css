@@ -1,7 +1,7 @@
 .lightbox {
   position: fixed;
   inset: 0;
-  z-index: 999;
+  z-index: var(--z-lightbox);
 }
 
 .carousel {
@@ -91,8 +91,12 @@
 .navigation button {
   width: 50%;
   border: none;
-  outline: none;
   background-color: transparent;
+}
+
+.navigation button:focus-visible {
+  outline: 2px solid var(--grey1);
+  outline-offset: -2px;
 }
 
 .navigation button.next {
@@ -114,9 +118,9 @@
 .close {
   position: absolute;
   z-index: 1;
-  width: 24px;
-  height: 24px;
-  border-radius: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
   border: none;
   background-color: var(--wash2);
   top: 12px;
@@ -124,12 +128,17 @@
   cursor: pointer;
 }
 
+.close:focus-visible {
+  outline: 2px solid var(--grey1);
+  outline-offset: 2px;
+}
+
 .close::after,
 .close::before {
   content: "";
   position: absolute;
   width: 2px;
-  height: 11px;
+  height: 14px;
   background-color: var(--grey3);
   left: 50%;
   top: 50%;

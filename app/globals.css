@@ -8,6 +8,12 @@
   --wash1: #e5e5e5;
   --wash2: #f2f2f2;
   --transparentBorder: rgba(0, 0, 0, 0.05);
+
+  /* z-index scale */
+  --z-dropdown: 100;
+  --z-modal: 200;
+  --z-lightbox: 300;
+  --z-toast: 400;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,6 +53,10 @@ body {
 a {
   color: inherit;
   text-decoration: none;
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
 }
 
 @media (prefers-color-scheme: dark) {

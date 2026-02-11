@@ -13,27 +13,23 @@ pnpm deploy       # Build and deploy to Cloudflare Workers
 
 ## Architecture
 
-This is a personal portfolio/CV website built with Astro and React, deployed to Cloudflare Workers.
+Personal portfolio/CV website built with Astro, deployed to Cloudflare Workers. Dark terminal aesthetic with visible markdown syntax.
 
 ### Tech Stack
 - **Astro 5** - Static site generator with `output: 'static'`
-- **React 19** - Client-side interactivity via `client:load` directive
 - **TypeScript** - Strict mode via Astro's tsconfig
 - **Cloudflare Workers** - Hosting via Wrangler
+- **Ubuntu Sans Mono** - Monospace font from Google Fonts
 
 ### Data Flow
-1. CV data lives in `/public/data/cv.json`
-2. Content sections are MDX files in `/public/content/sections/` (jobs, side-projects, talks, links, education)
-3. `src/pages/index.astro` fetches cv.json and passes it to the React Profile component
-4. Profile renders sections dynamically based on the JSON structure
+1. All site content lives in `src/content/site.md` as plain markdown with YAML frontmatter
+2. `src/pages/index.astro` imports the raw markdown via `rawContent()`
+3. `VisibleMarkdown.astro` parses markdown at build time, rendering with visible grayed-out syntax symbols
 
 ### Key Components
-- **Profile.tsx** - Main component that renders CV sections
-- **Attachments.tsx** - Horizontal scrolling media gallery with ScrollBooster
-- **Lightbox.tsx** - Full-screen media viewer (uses ReactDOM.createPortal)
-- **RichText.tsx** - Memoized Markdown renderer
+- **VisibleMarkdown.astro** - Custom markdown renderer that shows syntax symbols (##, ###, -, ---) grayed out while applying formatting
 
 ### Styling
-- CSS Modules for component styles (e.g., `Profile.module.css`)
-- Global theme variables in `src/styles/globals.css`
-- Dark mode support via CSS custom properties
+- Global styles in `src/styles/globals.css`
+- Dark-only theme (#0a0a0a background)
+- Scoped styles in index.astro for layout

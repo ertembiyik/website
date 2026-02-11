@@ -1,14 +1,28 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import Profile from '../components/Profile';
-import cvData from '../../public/data/cv.json';
-import pageStyles from '../styles/page.module.css';
+import VisibleMarkdown from '../components/VisibleMarkdown.astro';
+import * as site from '../content/site.md';
 
-const cv = cvData;
+const { title, description } = site.frontmatter;
+const content = site.rawContent();
 ---
 
-<Layout title={cv.general.displayName} description={cv.general.byline}>
-  <div class={pageStyles.page}>
-    <Profile cv={cv} client:load />
-  </div>
+<Layout title={title} description={description}>
+  <main>
+    <VisibleMarkdown text={content} />
+  </main>
 </Layout>
+
+<style>
+  main {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 64px 24px;
+  }
+
+  @media (max-width: 480px) {
+    main {
+      padding: 32px 16px;
+    }
+  }
+</style>

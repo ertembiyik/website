@@ -1,0 +1,43 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import VisibleMarkdown from '../../components/VisibleMarkdown.astro';
+
+export function getStaticPaths() {
+  return [
+    { params: { slug: 'bluerage' } },
+    { params: { slug: 'haptics' } },
+    { params: { slug: 'reality' } },
+    { params: { slug: 'agentation' } },
+    { params: { slug: 'ios-resolution' } },
+    { params: { slug: 'punto' } },
+  ];
+}
+
+const { slug } = Astro.params;
+
+const pages = import.meta.glob('../../content/projects/*.md', { eager: true }) as Record<string, any>;
+const page = Object.values(pages).find((p: any) => p.file?.endsWith(`${slug}.md`)) as any;
+
+const { title } = page.frontmatter;
+const content = page.rawContent();
+---
+
+<Layout title={`${title} — Ertem Biyik`}>
+  <main>
+    <VisibleMarkdown text={content} />
+  </main>
+</Layout>
+
+<style>
+  main {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 64px 24px;
+  }
+
+  @media (max-width: 480px) {
+    main {
+      padding: 32px 16px;
+    }
+  }
+</style>

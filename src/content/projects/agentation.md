@@ -14,4 +14,6 @@ Floating toolbar for interactive element selection and annotation. Supports both
 
 Two data source strategies: accessibility tree and view hierarchy traversal. Multiple output formats (Markdown and JSON).
 
-Publications: [GitHub](https://github.com/ertembiyik/swift-agentation), [X](https://x.com/ertembiyik/status/2019811409048244312), [Medium](https://medium.com/@ertembiyik/i-built-a-tool-that-lets-you-point-at-ios-views-and-tell-ai-what-to-change-ebfea007fa37)
+- [GitHub](https://github.com/ertembiyik/swift-agentation)
+- [X](https://x.com/ertembiyik/status/2019811409048244312)
+- [Medium](https://medium.com/@ertembiyik/i-built-a-tool-that-lets-you-point-at-ios-views-and-tell-ai-what-to-change-ebfea007fa37)

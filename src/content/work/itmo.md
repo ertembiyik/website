@@ -8,6 +8,6 @@ title: ITMO University
 
 ---
 
-Delivered lectures on iOS development, conducted live coding sessions, and evaluated student assignments
+Delivered lectures on iOS development to ICPC most winning students, conducted live coding sessions, and evaluated student assignments
 
-Publications: [Course announcement](https://education.vk.company/program/237)
+[Course announcement](https://education.vk.company/program/237)

@@ -5,8 +5,6 @@ description: Senior Software Engineer
 
 # Ertem Biyik
 
-## Senior iOS Engineer
-
 ---
 
 Hi my name is Ertem! I'm a software engineer, whose main focus is creating stunning apps for Apple platforms. I value great design, which drives user attention, yet covering the needs, creativity in every part of the product and of course having fun along the way! I do a lot of side projects in my free time with my friends, mostly in consumer + AI space.
@@ -16,6 +14,7 @@ Hi my name is Ertem! I'm a software engineer, whose main focus is creating stunn
 ## Work Experience
 
 ### [VK](/work/vk)
+
 2022 — 2025
 
 Biggest social network in Eastern Europe (100M+ MAU). Shipped miniapps platform, superapp, infrastructure, performance optimization, hacks, AI tooling.
@@ -23,6 +22,7 @@ Biggest social network in Eastern Europe (100M+ MAU). Shipped miniapps platform,
 [vk.com](http://vk.com)
 
 ### [ITMO University](/work/itmo)
+
 2023 — 2024
 
 Delivered lectures on iOS development to ICPC most winning students.
@@ -30,6 +30,7 @@ Delivered lectures on iOS development to ICPC most winning students.
 [en.itmo.ru](https://en.itmo.ru/)
 
 ### [Sparrowcode](/work/sparrowcode)
+
 2022
 
 Built a comprehensive Ethereum library in Swift.
@@ -37,6 +38,7 @@ Built a comprehensive Ethereum library in Swift.
 [sparrowcode.io](https://sparrowcode.io)
 
 ### [Kultura Records Store](/work/kultura)
+
 2022
 
 Built a barcode scanner app to preview vinyl/cassette content in a record shop.
@@ -47,7 +49,32 @@ Built a barcode scanner app to preview vinyl/cassette content in a record shop.
 
 ## Side Projects
 
+### [Swift Agentation](/projects/agentation)
+
+2026
+
+An iOS library that lets developers provide visual context from their apps to AI coding agents.
+
+[GitHub](https://github.com/ertembiyik/swift-agentation)
+
+### [iOS Resolution](/projects/ios-resolution)
+
+2026
+
+Raycast extension to browse and search display specifications for every iOS, iPadOS, watchOS, and macOS device.
+
+[Raycast Store](https://www.raycast.com/ertem_biyik/ios-resolution)
+
+### [Punto](/projects/punto)
+
+2025
+
+Raycast extension that switches keyboard layout of selected text between Latin and Cyrillic scripts.
+
+[Raycast Store](https://www.raycast.com/red.avtovo/punto)
+
 ### [Bluerage Software](/projects/bluerage)
+
 2025 — Now
 
 Started as personal software (miniapps), pivoted to declarative visual agents creation.
@@ -55,6 +82,7 @@ Started as personal software (miniapps), pivoted to declarative visual agents cr
 [bluerage.software](https://bluerage.software)
 
 ### [Haptics](/projects/haptics)
+
 2024
 
 iOS app for real-time touch communication between friends, featured by Spotted in Prod.
@@ -62,52 +90,33 @@ iOS app for real-time touch communication between friends, featured by Spotted i
 [AppStore](https://apps.apple.com/us/app/haptics-send-love-to-friends/id6503260004)
 
 ### [Reality](/projects/reality)
+
 2023 — 2024
 
 AR app for placing digital content in real-world locations using geospatial tech.
 
 [AppStore](https://apps.apple.com/us/app/reality-build-your-world/id6474273304)
 
-### [Swift Agentation](/projects/agentation)
-2025
-
-An iOS library that lets developers provide visual context from their apps to AI coding agents.
-
-[GitHub](https://github.com/ertembiyik/swift-agentation)
-
-### [iOS Resolution](/projects/ios-resolution)
-2024
-
-Raycast extension to browse and search display specifications for every iOS, iPadOS, watchOS, and macOS device.
-
-[Raycast Store](https://www.raycast.com/ertem_biyik/ios-resolution)
-
-### [Punto](/projects/punto)
-2024
-
-Raycast extension that switches keyboard layout of selected text between Latin and Cyrillic scripts.
-
-[Raycast Store](https://www.raycast.com/red.avtovo/punto)
-
 ---
 
 ## Speaking
 
 ### [CoreImage](https://www.youtube.com/watch?v=WytO_dmqr7s)
+
 2023
 
 How we went from custom Accelerate based image filters to Metal and CoreImage
 
-Publications: [YouTube](https://www.youtube.com/watch?v=WytO_dmqr7s)
+[YouTube](https://www.youtube.com/watch?v=WytO_dmqr7s)
 
 ---
 
 ## Contact
 
 - [Cal.com](https://cal.com/ertembiyik)
+- [X](https://x.com/ertembiyik)
+- [Telegram](https://t.me/gronzeisl)
 - [Email](mailto:ertembiyik@gmail.com)
 - [GitHub](https://github.com/ertembiyik)
 - [LinkedIn](https://linkedin.com/in/ertembiyik)
-- [Telegram](https://t.me/gronzeisl)
 - [Website](https://ertembiyik.com)
-- [X](https://x.com/ertembiyik)

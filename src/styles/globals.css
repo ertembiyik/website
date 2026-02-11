@@ -120,6 +120,7 @@ a:hover {
 /* Markdown list items */
 .md-li {
   display: flex;
+  gap: 8px;
   margin: 2px 0;
 }
 

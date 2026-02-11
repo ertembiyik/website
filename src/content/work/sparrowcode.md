@@ -8,8 +8,6 @@ title: Sparrowcode
 
 ---
 
-Led the creation of a comprehensive Ethereum library in Swift
+Led the creation of a comprehensive Ethereum library in Swift: RLP encoding/decoding, value converters, key utilities, and support for smart contracts
 
-RLP encoding/decoding, value converters, key utilities, and support for smart contracts
-
-Publications: [GitHub](https://github.com/sparrowcode/swift-ethereum)
+[GitHub](https://github.com/sparrowcode/swift-ethereum)

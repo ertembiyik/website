@@ -63,6 +63,14 @@ Built a barcode scanner app to preview vinyl/cassette content in a record shop
 
 ## Side Projects
 
+### [RLM-TS](/projects/rlm-ts)
+
+2026
+
+TypeScript implementation of Recursive Language Models — an inference paradigm where models recursively decompose and process long contexts by writing code that invokes LLMs
+
+[GitHub](https://github.com/ertembiyik/rlm-ts)
+
 ### [Swift Agentation](/projects/agentation)
 
 2026

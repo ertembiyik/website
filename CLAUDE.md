@@ -21,15 +21,23 @@ Personal portfolio/CV website built with Astro, deployed to Cloudflare Workers. 
 - **Cloudflare Workers** - Hosting via Wrangler
 - **Ubuntu Sans Mono** - Monospace font from Google Fonts
 
+### Content Structure
+- `src/content/site.md` - Main page content (YAML frontmatter + markdown)
+- `src/content/work/*.md` - Work experience entries (routed via `src/pages/work/[slug].astro`)
+- `src/content/projects/*.md` - Project entries (routed via `src/pages/projects/[slug].astro`)
+- Dynamic routes use Astro's `getStaticPaths()` for static generation
+
 ### Data Flow
-1. All site content lives in `src/content/site.md` as plain markdown with YAML frontmatter
-2. `src/pages/index.astro` imports the raw markdown via `rawContent()`
-3. `VisibleMarkdown.astro` parses markdown at build time, rendering with visible grayed-out syntax symbols
+1. `src/pages/index.astro` imports `site.md` via `rawContent()` for custom parsing
+2. `VisibleMarkdown.astro` parses raw markdown at build time, rendering with visible grayed-out syntax symbols
+3. Detail pages use progressive disclosure — short summaries on main page link to dedicated pages
 
 ### Key Components
-- **VisibleMarkdown.astro** - Custom markdown renderer that shows syntax symbols (##, ###, -, ---) grayed out while applying formatting
+- **VisibleMarkdown.astro** - Custom regex-based markdown renderer. Shows syntax symbols (##, ###, -, ---) grayed out while applying formatting. Differentiates internal vs external links.
+- **Layout.astro** - Shared layout wrapper
 
 ### Styling
-- Global styles in `src/styles/globals.css`
-- Dark-only theme (#0a0a0a background)
+- Global styles and CSS variables in `src/styles/globals.css`
+- Dark-only theme (#0a0a0a background), no light mode
+- Zero client-side JavaScript — pure static HTML
 - Scoped styles in index.astro for layout

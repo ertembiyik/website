@@ -1,36 +1,13 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import VisibleMarkdown from '../components/VisibleMarkdown.astro';
+import * as notFound from '../content/404.md';
 
-const content = `# 404
-
+const { title } = notFound.frontmatter;
+const content = notFound.rawContent();
 ---
 
-**Page not found.** You've navigated to a route that doesn't exist. Much like a nil pointer, this leads nowhere.
-
----
-
-### Possible reasons
-
-- You followed a broken link
-- You typed the URL by hand and made a typo
-- The page has been moved or deleted
-- The universe is deterministic and this was always going to happen
-
----
-
-### Suggested fixes
-
-- *Double-check* the URL
-- *Go back* to [home](/) and start over
-- *Accept* that not all paths resolve
-
----
-
-Maybe try [home](/) — it definitely exists.`;
----
-
-<Layout title="404 — Ertem Biyik">
+<Layout title={title}>
   <main>
     <VisibleMarkdown text={content} />
   </main>

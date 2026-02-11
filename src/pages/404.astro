@@ -1,0 +1,28 @@
+---
+import Layout from '../layouts/Layout.astro';
+import VisibleMarkdown from '../components/VisibleMarkdown.astro';
+import * as notFound from '../content/404.md';
+
+const { title } = notFound.frontmatter;
+const content = notFound.rawContent();
+---
+
+<Layout title={title}>
+  <main>
+    <VisibleMarkdown text={content} />
+  </main>
+</Layout>
+
+<style>
+  main {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 64px 24px;
+  }
+
+  @media (max-width: 480px) {
+    main {
+      padding: 32px 16px;
+    }
+  }
+</style>

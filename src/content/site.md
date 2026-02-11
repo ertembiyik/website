@@ -13,6 +13,14 @@ Hi my name is Ertem! I'm a software engineer, whose main focus is creating stunn
 
 ## Work Experience
 
+### [Bluerage Software](/work/bluerage)
+
+2025 — Now
+
+Started as personal software (miniapps), pivoted to declarative visual agents creation.
+
+[bluerage.software](https://bluerage.software)
+
 ### [VK](/work/vk)
 
 2022 — 2025
@@ -72,14 +80,6 @@ Raycast extension to browse and search display specifications for every iOS, iPa
 Raycast extension that switches keyboard layout of selected text between Latin and Cyrillic scripts.
 
 [Raycast Store](https://www.raycast.com/red.avtovo/punto)
-
-### [Bluerage Software](/projects/bluerage)
-
-2025 — Now
-
-Started as personal software (miniapps), pivoted to declarative visual agents creation.
-
-[bluerage.software](https://bluerage.software)
 
 ### [Haptics](/projects/haptics)
 

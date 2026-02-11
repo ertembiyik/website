@@ -41,7 +41,7 @@ Biggest social network in Eastern Europe (100M+ MAU). Shipped miniapps platform,
 
 Delivered lectures on iOS development to ICPC most winning students
 
-[en.itmo.ru](https://en.itmo.ru/)
+[itmo.ru](https://en.itmo.ru/)
 
 ### [Sparrowcode](/work/sparrowcode)
 
@@ -53,7 +53,7 @@ Built a comprehensive Ethereum library in Swift
 
 ### [Kultura Records Store](/work/kultura)
 
-2022
+2021
 
 Built a barcode scanner app to preview vinyl/cassette content in a record shop
 

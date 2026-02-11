@@ -101,7 +101,7 @@ AR app for placing digital content in real-world locations using geospatial tech
 
 ## Speaking
 
-### [CoreImage](https://www.youtube.com/watch?v=WytO_dmqr7s)
+### [CoreImage](/speaking/core-image)
 
 2023
 

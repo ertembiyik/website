@@ -1,0 +1,49 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import VisibleMarkdown from '../../components/VisibleMarkdown.astro';
+
+const allContent = import.meta.glob('../../content/**/*.md', { eager: true }) as Record<string, any>;
+
+export function getStaticPaths() {
+  const allContent = import.meta.glob('../../content/**/*.md', { eager: true }) as Record<string, any>;
+  const exclude = ['site.md', '404.md'];
+
+  return Object.values(allContent)
+    .filter((p: any) => !exclude.some((name) => p.file?.endsWith(name)))
+    .map((p: any) => {
+      const parts = p.file.split('/');
+      const slug = parts.at(-1).replace('.md', '');
+      const category = parts.at(-2);
+      return { params: { category, slug } };
+    });
+}
+
+const { category, slug } = Astro.params;
+
+const page = Object.values(allContent).find((p: any) =>
+  p.file?.endsWith(`${category}/${slug}.md`)
+) as any;
+
+const { title } = page.frontmatter;
+const content = page.rawContent();
+---
+
+<Layout title={`${title} — Ertem Biyik`}>
+  <main>
+    <VisibleMarkdown text={content} />
+  </main>
+</Layout>
+
+<style>
+  main {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 64px 24px;
+  }
+
+  @media (max-width: 480px) {
+    main {
+      padding: 32px 16px;
+    }
+  }
+</style>

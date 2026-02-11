@@ -124,6 +124,10 @@ a:hover {
   margin: 2px 0;
 }
 
+.md-li span {
+  color: var(--text-dim);
+}
+
 .md-li .sym {
   flex-shrink: 0;
 }

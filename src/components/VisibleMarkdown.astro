@@ -1,0 +1,86 @@
+---
+interface Props {
+  text: string;
+}
+
+const { text } = Astro.props;
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function processInline(line: string): string {
+  // Process links: [text](url) → normal underlined link (no visible syntax)
+  line = line.replace(
+    /\[([^\]]+)\]\(([^)]+)\)/g,
+    (_match, text, url) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(text)}</a>`
+  );
+
+  // Process bold: **text** → gray ** + bold text + gray **
+  line = line.replace(
+    /\*\*(.+?)\*\*/g,
+    '<span class="sym">**</span><strong>$1</strong><span class="sym">**</span>'
+  );
+
+  // Process italic: *text* (not inside **)
+  line = line.replace(
+    /(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g,
+    '<span class="sym">*</span><em>$1</em><span class="sym">*</span>'
+  );
+
+  return line;
+}
+
+function processMarkdown(input: string): string {
+  const blocks = input.split('\n\n');
+  const result: string[] = [];
+
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (!trimmed) continue;
+
+    const lines = trimmed.split('\n');
+
+    for (const line of lines) {
+      // Horizontal rule
+      if (line.trim() === '---') {
+        result.push('<div class="md-hr"><span class="sym">---</span></div>');
+        continue;
+      }
+
+      // Headings
+      const headingMatch = line.match(/^(#{1,4})\s+(.*)/);
+      if (headingMatch) {
+        const level = headingMatch[1].length;
+        const hashes = headingMatch[1];
+        const content = processInline(headingMatch[2]);
+        result.push(`<h${level}><span class="sym">${hashes} </span>${content}</h${level}>`);
+        continue;
+      }
+
+      // List items
+      if (line.startsWith('- ')) {
+        const content = processInline(line.slice(2));
+        result.push(`<div class="md-li"><span class="sym">- </span><span>${content}</span></div>`);
+        continue;
+      }
+
+      // Regular paragraph
+      const content = processInline(line);
+      if (content.trim()) {
+        result.push(`<p>${content}</p>`);
+      }
+    }
+  }
+
+  return result.join('\n');
+}
+
+const html = processMarkdown(text);
+---
+
+<Fragment set:html={html} />

@@ -22,8 +22,8 @@ Personal portfolio/CV website built with Astro, deployed to Cloudflare Workers. 
 - **Ubuntu Sans Mono** - Monospace font from Google Fonts
 
 ### Data Flow
-1. CV data lives in `/public/data/cv.json`
-2. `src/pages/index.astro` reads cv.json and constructs markdown strings
+1. All site content lives in `src/content/site.md` as plain markdown with YAML frontmatter
+2. `src/pages/index.astro` imports the raw markdown via `rawContent()`
 3. `VisibleMarkdown.astro` parses markdown at build time, rendering with visible grayed-out syntax symbols
 
 ### Key Components

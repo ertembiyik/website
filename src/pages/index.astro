@@ -1,50 +1,15 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import VisibleMarkdown from '../components/VisibleMarkdown.astro';
-import cv from '../../public/data/cv.json';
+import * as site from '../content/site.md';
+
+const { title, description } = site.frontmatter;
+const content = site.rawContent();
 ---
 
-<Layout title={cv.general.displayName} description={cv.general.byline}>
+<Layout title={title} description={description}>
   <main>
-    <VisibleMarkdown text={`# ${cv.general.displayName}`} />
-    <VisibleMarkdown text={`## ${cv.general.profession}`} />
-
-    <VisibleMarkdown text="---" />
-
-    <VisibleMarkdown text={cv.general.about} />
-
-    {cv.allCollections.map((collection: any) => (
-      <>
-        <VisibleMarkdown text="---" />
-        <VisibleMarkdown text={`## ${collection.name}`} />
-
-        {collection.name === 'Contact' ? (
-          <div class="contact-list">
-            {collection.items.map((item: any) => (
-              <VisibleMarkdown text={`- [${item.platform}](${item.url})`} />
-            ))}
-          </div>
-        ) : (
-          <div class="items">
-            {collection.items.map((item: any) => {
-              const year = String(item.year);
-              const heading = item.url
-                ? `[${item.heading}](${item.url})`
-                : item.heading;
-              const lines = [`### ${heading}`, year];
-              if (item.description) {
-                lines.push('', item.description);
-              }
-              return (
-                <div class="item">
-                  <VisibleMarkdown text={lines.join('\n')} />
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </>
-    ))}
+    <VisibleMarkdown text={content} />
   </main>
 </Layout>
 
@@ -53,27 +18,6 @@ import cv from '../../public/data/cv.json';
     max-width: var(--max-width);
     margin: 0 auto;
     padding: 64px 24px;
-  }
-
-  .items {
-    display: flex;
-    flex-direction: column;
-    gap: 32px;
-  }
-
-  .item :global(h3) {
-    margin-bottom: 2px;
-  }
-
-  .item :global(p:first-of-type) {
-    color: var(--text-dim);
-    margin-bottom: 12px;
-  }
-
-  .contact-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
   }
 
   @media (max-width: 480px) {

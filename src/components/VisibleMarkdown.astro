@@ -14,10 +14,16 @@ function escapeHtml(str: string): string {
 }
 
 function processInline(line: string): string {
-  // Process links: [text](url) → normal underlined link (no visible syntax)
+  // Process links: [text](url) → normal underlined link
+  // Internal links (starting with /) stay in same tab, external links open in new tab
   line = line.replace(
     /\[([^\]]+)\]\(([^)]+)\)/g,
-    (_match, text, url) => `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">${escapeHtml(text)}</a>`
+    (_match, text, url) => {
+      const escaped = escapeHtml(url);
+      const isInternal = url.startsWith('/');
+      const attrs = isInternal ? '' : ' target="_blank" rel="noopener"';
+      return `<a href="${escaped}"${attrs}>${escapeHtml(text)}</a>`;
+    }
   );
 
   // Process bold: **text** → gray ** + bold text + gray **

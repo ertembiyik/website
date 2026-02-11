@@ -29,6 +29,7 @@ html {
 
 body {
   font-family: var(--font-mono);
+  font-weight: 700;
   background-color: var(--bg);
   color: var(--text);
   min-height: 100vh;
@@ -53,26 +54,33 @@ h2 {
   font-size: 1.15rem;
   font-weight: 600;
   line-height: 1.4;
-  margin-top: 48px;
-  margin-bottom: 20px;
+  margin-top: 8px;
+  margin-bottom: 24px;
 }
 
 h3 {
   font-size: 1rem;
   font-weight: 600;
   line-height: 1.5;
+  margin-top: 32px;
+}
+
+h3:first-child,
+h2 + h3 {
+  margin-top: 0;
 }
 
 h4 {
   font-size: var(--font-size);
-  font-weight: normal;
-  color: var(--text-dim);
+  font-weight: 700;
+  color: var(--text);
   line-height: 1.5;
+  margin-top: 20px;
 }
 
 /* Paragraphs */
 p {
-  margin-bottom: 8px;
+  margin-bottom: 12px;
   color: var(--text-dim);
 }
 
@@ -105,7 +113,7 @@ a:hover {
 
 /* Markdown horizontal rule */
 .md-hr {
-  margin: 32px 0;
+  margin: 24px 0;
   font-size: var(--font-size);
 }
 

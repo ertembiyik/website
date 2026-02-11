@@ -15,119 +15,79 @@ Hi my name is Ertem! I'm a software engineer, whose main focus is creating stunn
 
 ## Work Experience
 
-### [Senior iOS Engineer at Infrastructure Team at VK](http://vk.com)
-2024 — Now
+### [VK](/work/vk)
+2022 — 2025
 
-Performance Optimization: analyzed app startup bottlenecks and implemented improvements, reducing app launch time by 8%, leading to a smoother user experience
+Biggest social network in Eastern Europe (100M+ MAU). Shipped miniapps platform, superapp, infrastructure, performance optimization, hacks, AI tooling.
 
-AI Integration: led the AI gitlab code review integration, created a cli coding agent to help testers write autotests
+[vk.com](http://vk.com)
 
-Skills: Swift, Obj-C, UIKit, ClickHouse, MetricKit, TypeScript, Ink JS, Vercel AI SDK, Docker.
-
-### [iOS Engineer at Infrastructure Team at VK](http://vk.com)
-2024
-
-Design System: played a key role in developing and refining VK's design system (VKUI)
-
-Optimized image filters to speed up main feed load times by switching from Accelerate to CoreImage and streamlining the render pipeline to a single pass
-
-Skills: Swift, Obj-C, UIKit, SwiftUI, TextKit, CoreGraphics, CoreAnimation, CoreImage, Metal, Accelerate, XCTest, MetricKit.
-
-### [Lecturer at ITMO University](https://en.itmo.ru/)
+### [ITMO University](/work/itmo)
 2023 — 2024
 
-Delivered lectures on iOS development, conducted live coding sessions, and evaluated student assignments
+Delivered lectures on iOS development to ICPC most winning students.
 
-Publications: [Course announcement](https://education.vk.company/program/237)
+[en.itmo.ru](https://en.itmo.ru/)
 
-### [iOS Engineer at SuperApp Team at VK](http://vk.com)
-2023 — 2024
-
-Service's showcase: rebuilt main navigation entry point for VK App users from the ground up, creating a complex interactive collection with multiple sections, custom layout logic, realtime SSE updates, custom collection view animations
-
-Service's showcase settings: implemented widgets settings, so users can customize the showcase to their needs. Implemented custom drag-n-drop logic similar to springboard mechanic
-
-TabBar customization: this feature allows users to setup their tabbar by selecting most used tabs. Led the development of the whole feature with the most 'fun' part of disassembling UIKit to find private API's to allow more than 5 tabs on iOS devices
-
-Publications: [Tab Bar settings release](https://m.vk.com/wall-35005_54964)
-
-Skills: Swift, Obj-C, UIKit, CoreGraphics, CoreAnimation, Lottie, RLottie, Swift Structured Concurrency, GCD, HealthKit, Combine, Yoga.
-
-### [Junior iOS Engineer at SuperApp Team at VK](http://vk.com)
-2022 — 2023
-
-MiniApps platform: WebView based apps with an ability to call native code via JavaScriptCore message handlers
-
-MiniApps Catalog (MiniApps store)
-
-LiveActivities
-
-Apple Watch app
-
-MiniApps ads system
-
-Publications: [VK Apple Watch App release](https://vk.com/watch)
-
-Skills: Swift, Obj-C, UIKit, CoreGraphics, CoreAnimation, GCD, HealthKit, Combine, ActivityKit, WidgetKit, WebKit, JavaScriptCore, WatchKit, CoreLocation.
-
-### [Swift Engineer at Sparrowcode](https://sparrowcode.io)
+### [Sparrowcode](/work/sparrowcode)
 2022
 
-Led the creation of a comprehensive Ethereum library in Swift
+Built a comprehensive Ethereum library in Swift.
 
-RLP encoding/decoding, value converters, key utilities, and support for smart contracts
+[sparrowcode.io](https://sparrowcode.io)
 
-Publications: [GitHub](https://github.com/sparrowcode/swift-ethereum)
-
-Skills: Swift, CryptoKit, XCTest, Swift Structured Concurrency, GCD.
-
-### [iOS Developer at Kultura Records Store](https://kulturarecordstore.ru/)
+### [Kultura Records Store](/work/kultura)
 2022
 
-Developed an app enabling users to scan item barcodes to preview vinyl/cassette content, reducing employee workload by 1-3 hours daily
+Built a barcode scanner app to preview vinyl/cassette content in a record shop.
 
-Publications: [AppStore](https://apps.apple.com/us/app/kultura/id1591618437)
-
-Skills: Swift, UIKit, SwiftUI, TCA, Combine, Swift Structured Concurrency, swift-dependancies, AVFoundation, CoreData.
+[kulturarecordstore.ru](https://kulturarecordstore.ru/)
 
 ---
 
 ## Side Projects
 
-### [Bluerage Software](https://bluerage.software)
+### [Bluerage Software](/projects/bluerage)
 2025 — Now
 
-We started as a platform for creating MiniApps using prompts from your phone end to end. Since software creation became cheap, users that were prior not able to express their ideas now could instantly create and share them
+Started as personal software (miniapps), pivoted to declarative visual agents creation.
 
-We were in close connection with [zfellows](https://zfellows.com) while working on this idea
+[bluerage.software](https://bluerage.software)
 
-We then decided to pivot from an iOS app to a Telegram bot and target an already existing Telegram MiniApps platform
-
-Publications: [X](https://x.com/blueragehq), [Site](https://bluerage.software)
-
-Skills: Swift, UIKit, SwiftUI, Factory, Rive, WebKit, Supabase, swift-openapi, Nuke, PinLayout, Observation, mlx-swift, Fly, Sentry, PostHog, Railway, Axiom, Cloudflare, Next JS, Vercel AI SDK, Hono
-
-### [Haptics](https://apps.apple.com/us/app/haptics-send-love-to-friends/id6503260004)
+### [Haptics](/projects/haptics)
 2024
 
-I developed and shipped Haptics, an iOS application that enables real-time communication between users through touch, drawings, and interactive feedback. The app was featured by the Spotted in Prod Twitter account and gained significant interest in design community
+iOS app for real-time touch communication between friends, featured by Spotted in Prod.
 
-Technical: custom highly optimised CoreAnimation drawing engine, Metal based visual effects, SpriteKit scenes, single source of truth mvvm based architecture
+[AppStore](https://apps.apple.com/us/app/haptics-send-love-to-friends/id6503260004)
 
-Publications: [AppStore](https://apps.apple.com/us/app/haptics-send-love-to-friends/id6503260004), [Spotted in Prod](https://x.com/spottedinprod/status/1847377048417030216)
-
-Skills: Swift, UIKit, SwiftUI, swift-dependancies, Nuke, Firebase, Metal, CoreAnimation, CoreGraphics, SpriteKit, PinLayout, Yoga, WidgetKit, AppIntents, StoreKit, Combine, Swift Structured Concurrency, GCD
-
-### [Reality](https://apps.apple.com/us/app/reality-build-your-world/id6474273304)
+### [Reality](/projects/reality)
 2023 — 2024
 
-I developed and shipped Reality, an AR iOS application that enables users to place digital assets in real-world locations and discover content left by others. The app creates a persistent digital layer over the physical world through advanced geospatial AR technology
+AR app for placing digital content in real-world locations using geospatial tech.
 
-Technical: ARKit + Google ARCore Geospatial API integration, RealityKit entity management system, GeoHash-based spatial querying with Firebase Firestore, VPS (Visual Positioning System) for precise world anchoring
+[AppStore](https://apps.apple.com/us/app/reality-build-your-world/id6474273304)
 
-Publications: [AppStore](https://apps.apple.com/us/app/reality-build-your-world/id6474273304)
+### [Swift Agentation](/projects/agentation)
+2025
 
-Skills: Swift, UIKit, swift-dependancies, Nuke, Firebase, ARKit, RealityKit, CoreAnimation, CoreGraphics, PinLayout, Yoga, Combine, Swift Structured Concurrency, GCD, CoreLocation, AVFoundation, ARCore, MapKit
+An iOS library that lets developers provide visual context from their apps to AI coding agents.
+
+[GitHub](https://github.com/ertembiyik/swift-agentation)
+
+### [iOS Resolution](/projects/ios-resolution)
+2024
+
+Raycast extension to browse and search display specifications for every iOS, iPadOS, watchOS, and macOS device.
+
+[Raycast Store](https://www.raycast.com/ertem_biyik/ios-resolution)
+
+### [Punto](/projects/punto)
+2024
+
+Raycast extension that switches keyboard layout of selected text between Latin and Cyrillic scripts.
+
+[Raycast Store](https://www.raycast.com/red.avtovo/punto)
 
 ---
 

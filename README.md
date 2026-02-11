@@ -1,6 +1,6 @@
 # ertembiyik.com
 
-Personal portfolio and CV website built with Astro and React, deployed to Cloudflare Workers.
+Personal portfolio and CV website built with Astro, deployed to Cloudflare Workers.
 
 ## Development
 
@@ -16,18 +16,17 @@ pnpm deploy       # Build and deploy to Cloudflare
 
 ```
 src/
+  content/site.md        # Main page content (YAML frontmatter + markdown)
+  content/work/*.md      # Work experience entries
+  content/projects/*.md  # Project entries
+  content/speaking/*.md  # Speaking entries
   pages/index.astro      # Main page
-  components/            # React components (Profile, Attachments, Lightbox)
+  components/            # VisibleMarkdown.astro (custom markdown renderer)
   layouts/Layout.astro   # HTML shell
-  styles/                # CSS Modules and globals
-
-public/
-  data/cv.json           # CV data
-  content/sections/      # MDX content (jobs, projects, talks, education)
+  styles/                # Global styles and CSS variables
 ```
 
 ## Tech Stack
 
 - **Astro** - Static site generation
-- **React** - Interactive components
 - **Cloudflare Workers** - Hosting

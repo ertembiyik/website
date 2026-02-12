@@ -2,7 +2,6 @@
 title: Haptics
 ---
 
-[← back](/)
 
 # Haptics
 

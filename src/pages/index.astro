@@ -1,14 +1,14 @@
 ---
-import Layout from '../layouts/Layout.astro';
-import VisibleMarkdown from '../components/VisibleMarkdown.astro';
-import * as site from '../content/site.md';
+import Layout from "../layouts/Layout.astro";
+import VisibleMarkdown from "../components/VisibleMarkdown.astro";
+import * as site from "../content/site.md";
 
 const { title, description } = site.frontmatter;
 const content = site.rawContent();
 ---
 
 <Layout title={title} description={description}>
-  <main>
+  <main transition:animate="slide">
     <VisibleMarkdown text={content} />
   </main>
 </Layout>

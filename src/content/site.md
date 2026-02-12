@@ -113,6 +113,28 @@ AR app for placing digital content in real-world locations using geospatial tech
 
 ---
 
+## Writing
+
+### [I Built a Tool That Lets You Point at iOS Views and Tell AI What to Change](https://x.com/ertembiyik/status/2019811409048244312)
+
+2026
+
+How swift-agentation works under the hood — walking accessibility trees, bridging SwiftUI views into UIKit inspection, and building a pass-through overlay
+
+### [A Modern iOS Project Setup in 15 Steps](https://x.com/ertembiyik/status/1974214274596642907)
+
+2025
+
+Tuist-based project structure, scalability patterns, build flags, and essential libraries for a production-ready iOS app
+
+### [Create a Beautiful Network Layer With Swift](https://medium.com/@ertembiyik/create-a-beautiful-network-layer-with-swift-f10a06e2c4b5)
+
+2022
+
+Building a scalable, generic network layer for iOS apps and Swift packages
+
+---
+
 ## Speaking
 
 ### [CoreImage](/speaking/core-image)

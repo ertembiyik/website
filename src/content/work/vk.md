@@ -2,7 +2,6 @@
 title: VK
 ---
 
-[← back](/)
 
 # VK
 

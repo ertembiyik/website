@@ -33,7 +33,7 @@ const content = page.rawContent();
 
 <Layout title={`${title} — Ertem Biyik`}>
   <main transition:animate="slide">
-    <p><a href="/" onclick="event.preventDefault(); history.back()">← back</a></p>
+    <p><a href="/" onclick="history.back(); return false">← back</a></p>
     <VisibleMarkdown text={content} />
   </main>
 </Layout>

@@ -2,7 +2,6 @@
 title: Kultura Records Store
 ---
 
-[← back](/)
 
 # Kultura Records Store
 

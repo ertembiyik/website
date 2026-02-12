@@ -2,7 +2,6 @@
 title: Bluerage Software
 ---
 
-[← back](/)
 
 # Bluerage Software
 

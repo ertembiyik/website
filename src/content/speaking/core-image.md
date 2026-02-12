@@ -2,7 +2,6 @@
 title: CoreImage
 ---
 
-[← back](/)
 
 # CoreImage
 

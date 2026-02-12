@@ -2,7 +2,6 @@
 title: ITMO University
 ---
 
-[← back](/)
 
 # ITMO University
 

@@ -2,7 +2,6 @@
 title: Reality
 ---
 
-[← back](/)
 
 # Reality
 

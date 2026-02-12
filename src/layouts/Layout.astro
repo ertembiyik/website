@@ -1,5 +1,6 @@
 ---
 import "../styles/globals.css";
+import { ClientRouter } from "astro:transitions";
 
 interface Props {
   title: string;
@@ -21,13 +22,9 @@ const { title, description } = Astro.props;
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Ubuntu+Sans+Mono:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet" />
+    <ClientRouter />
   </head>
   <body>
     <slot />
-    <script>
-      if ('scrollRestoration' in history) {
-        history.scrollRestoration = 'auto';
-      }
-    </script>
   </body>
 </html>

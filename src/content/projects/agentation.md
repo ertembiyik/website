@@ -2,7 +2,6 @@
 title: Swift Agentation
 ---
 
-[← back](/)
 
 # Swift Agentation
 

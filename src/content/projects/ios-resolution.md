@@ -2,7 +2,6 @@
 title: iOS Resolution
 ---
 
-[← back](/)
 
 # iOS Resolution
 

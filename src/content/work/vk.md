@@ -29,6 +29,8 @@ title: VK
 
 ## Infrastructure
 
+- Migrated the iOS app to Tuist, modularizing the codebase into 300+ modules.
+
 - Design System: played a key role in developing and refining VK's design system (VKUI).
 
 - Optimized image filters to speed up main feed load times by switching from Accelerate to CoreImage and streamlining the render pipeline to a single pass.

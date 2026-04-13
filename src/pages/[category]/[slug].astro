@@ -1,31 +1,60 @@
 ---
 import Layout from "../../layouts/Layout.astro";
 import VisibleMarkdown from "../../components/VisibleMarkdown.astro";
-const allContent = import.meta.glob("../../content/**/*.md", {
-  eager: true,
-}) as Record<string, any>;
+
+interface ContentFrontmatter {
+  title: string;
+  [key: string]: unknown;
+}
+
+interface ContentPage {
+  file: string;
+  frontmatter: ContentFrontmatter;
+  rawContent(): string;
+}
+
+function getAllContent() {
+  return import.meta.glob<ContentPage>("../../content/**/*.md", {
+    eager: true,
+  });
+}
+
+const allContent = getAllContent();
 
 export function getStaticPaths() {
-  const allContent = import.meta.glob("../../content/**/*.md", {
+  const allContent = import.meta.glob<ContentPage>("../../content/**/*.md", {
     eager: true,
-  }) as Record<string, any>;
-  const exclude = ["site.md", "404.md"];
+  });
+  const exclude = new Set(["site.md", "404.md"]);
 
   return Object.values(allContent)
-    .filter((p: any) => !exclude.some((name) => p.file?.endsWith(name)))
-    .map((p: any) => {
-      const parts = p.file.split("/");
-      const slug = parts.at(-1).replace(".md", "");
+    .filter((page) => !exclude.has(page.file.split("/").at(-1) ?? ""))
+    .flatMap((page) => {
+      const parts = page.file.split("/");
+      const fileName = parts.at(-1);
       const category = parts.at(-2);
-      return { params: { category, slug } };
+
+      if (!fileName || !category) {
+        return [];
+      }
+
+      return [{ params: { category, slug: fileName.replace(".md", "") } }];
     });
 }
 
 const { category, slug } = Astro.params;
 
-const page = Object.values(allContent).find((p: any) =>
-  p.file?.endsWith(`${category}/${slug}.md`),
-) as any;
+if (!category || !slug) {
+  throw new Error("Missing content route params.");
+}
+
+const page = Object.values(allContent).find((entry) =>
+  entry.file.endsWith(`${category}/${slug}.md`),
+);
+
+if (!page) {
+  throw new Error(`Content page not found for ${category}/${slug}.md`);
+}
 
 const { title } = page.frontmatter;
 const content = page.rawContent();

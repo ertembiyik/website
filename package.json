@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "lint": "eslint \"**/*.{js,mjs,cjs,ts,mts,cts,astro}\"",
+    "lint:fix": "eslint \"**/*.{js,mjs,cjs,ts,mts,cts,astro}\" --fix",
     "preview": "wrangler dev",
     "deploy": "astro build && wrangler deploy",
     "astro": "astro"
@@ -16,7 +18,12 @@
     "astro": "6.1.6"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@typescript-eslint/parser": "^8.58.2",
+    "eslint": "^10.2.0",
+    "eslint-plugin-astro": "^1.7.0",
     "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.2",
     "wrangler": "^4.82.2"
   }
 }

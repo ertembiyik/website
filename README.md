@@ -36,6 +36,12 @@ Build the site locally:
 bun run build
 ```
 
+Lint the Astro and TypeScript source:
+
+```bash
+bun run lint
+```
+
 Preview the built site through Wrangler:
 
 ```bash

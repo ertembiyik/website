@@ -4,7 +4,7 @@
 
 <h1 align="center">Website</h1>
 
-<p align="center">Source for <a href="https://ertembiyik.com">ertembiyik.com</a>, a portfolio and CV site built with Astro.</p>
+<p align="center">Source for <a href="https://ertembiyik.com">ertembiyik.com</a>, a portfolio site built with Astro.</p>
 
 <p align="center">
   <a href="https://ertembiyik.com">
@@ -16,13 +16,6 @@
 </p>
 
 `website` is a content-driven personal site with a dark terminal aesthetic, visible markdown syntax, and static deployment through Cloudflare Workers assets.
-
-## Highlights
-
-- Markdown-backed content for the homepage, work history, projects, and speaking
-- Custom `VisibleMarkdown.astro` renderer that keeps markdown syntax visible in the UI
-- Pure static Astro build with no custom Worker runtime and no client-side app framework
-- Bun-based local workflow with Wrangler deploys to Cloudflare
 
 ## Getting Started
 
@@ -57,10 +50,6 @@ bun run deploy
 ```
 
 The project does not require environment variables for local development or production deploys.
-
-## Architecture
-
-The site is built with Astro 6 and TypeScript. Content lives in `src/content/site.md` plus the category folders under `src/content/`, while route generation happens through static Astro pages and `getStaticPaths()`. Deployment is assets-only via Wrangler using the `dist/` output directory.
 
 ## License
 

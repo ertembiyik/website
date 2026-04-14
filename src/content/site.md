@@ -19,6 +19,14 @@ Hi! My name is Ertem. I'm a software engineer, whose main focus is creating stun
 
 ## Work Experience
 
+### [Pool](/work/pool)
+
+February 2026 — Now
+
+Founding engineer building Pool, an app to save anything with a screenshot
+
+[pool.day](https://pool.day)
+
 ### [Bluerage Software](/work/bluerage)
 
 2025 — Now

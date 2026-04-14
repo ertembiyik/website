@@ -29,7 +29,7 @@ Founding engineer building Pool, an app to save anything with a screenshot
 
 ### [Bluerage Software](/work/bluerage)
 
-2025 — Now
+March 2025 — February 2026
 
 Started as personal software (miniapps), pivoted to declarative agents creation
 
@@ -37,7 +37,7 @@ Started as personal software (miniapps), pivoted to declarative agents creation
 
 ### [VK](/work/vk)
 
-2022 — 2025
+August 2022 — November 2025
 
 Biggest social network in Eastern Europe (100M+ MAU). Shipped miniapps platform, superapp, infrastructure, performance optimization, hacks, AI tooling
 
@@ -45,7 +45,7 @@ Biggest social network in Eastern Europe (100M+ MAU). Shipped miniapps platform,
 
 ### [ITMO University](/work/itmo)
 
-2023 — 2024
+September 2023 — January 2024
 
 Delivered lectures on iOS development to ICPC most winning students
 
@@ -53,7 +53,7 @@ Delivered lectures on iOS development to ICPC most winning students
 
 ### [Sparrowcode](/work/sparrowcode)
 
-2022
+February 2022 — July 2022
 
 Built a comprehensive Ethereum library in Swift
 
@@ -61,7 +61,7 @@ Built a comprehensive Ethereum library in Swift
 
 ### [Kultura Records Store](/work/kultura)
 
-2021
+June 2021 — October 2022
 
 Built a barcode scanner app to preview vinyl/cassette content in a record shop
 

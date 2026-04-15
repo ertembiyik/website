@@ -13,7 +13,7 @@ Hi! My name is Ertem. I'm a software engineer, whose main focus is creating stun
 
 ## Contact
 
-[Cal.com](https://cal.com/ertembiyik) · [X](https://x.com/ertembiyik) · [Telegram](https://t.me/gronzeisl) · [Email](mailto:ertembiyik@gmail.com) · [GitHub](https://github.com/ertembiyik) · [LinkedIn](https://linkedin.com/in/ertembiyik)
+[Cal.com](https://cal.com/ertembiyik) · [X](https://x.com/ertembiyik) · [Telegram](https://t.me/gronzeisl) · [Email](mailto:hi@ertembiyik.com) · [GitHub](https://github.com/ertembiyik) · [LinkedIn](https://linkedin.com/in/ertembiyik)
 
 ---
 

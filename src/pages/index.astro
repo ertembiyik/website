@@ -1,28 +1,152 @@
 ---
+import { getCollection } from "astro:content";
+import AppIcon from "../components/AppIcon.astro";
+import IconTile from "../components/IconTile.astro";
 import Layout from "../layouts/Layout.astro";
-import VisibleMarkdown from "../components/VisibleMarkdown.astro";
-import * as site from "../content/site.md";
+import PhotoStack from "../components/PhotoStack.astro";
+import poolIcon from "../assets/icons/pool.png";
+import vkIcon from "../assets/icons/vk.png";
+import { connect, links, profile, writing } from "../data/site";
 
-const { title, description } = site.frontmatter;
-const content = site.rawContent();
+const byOrder = <T extends { data: { order: number } }>(a: T, b: T) =>
+  a.data.order - b.data.order;
+
+const [work, projects, speaking] = await Promise.all([
+  getCollection("work").then((list) => list.sort(byOrder)),
+  getCollection("projects").then((list) => list.sort(byOrder)),
+  getCollection("speaking").then((list) => list.sort(byOrder)),
+]);
+
+// Writing and talks share one list, newest first.
+const notes = [
+  ...writing.map((item) => ({ ...item, kind: "writing" as const, external: true })),
+  ...speaking.map((talk) => ({
+    title: talk.data.title,
+    year: talk.data.year,
+    href: `/speaking/${talk.id}`,
+    kind: "talk" as const,
+    external: false,
+  })),
+].sort((a, b) => b.year.localeCompare(a.year));
 ---
 
-<Layout title={title} description={description}>
-  <main transition:animate="slide">
-    <VisibleMarkdown text={content} />
+<Layout title={profile.name} home>
+  <main id="content" class="frame home">
+    <header class="hero reveal" style="--i: 0">
+      <PhotoStack width={96} height={120} />
+      <h1>{profile.name}</h1>
+      <div class="hero-copy">
+        <p>
+          Hi, I’m Ertem. I make apps for Apple platforms. Sometimes poke at what’s
+          underneath them. In my free time I build consumer + AI side projects
+          with friends, skate, play tennis, and nerd out on X
+        </p>
+        <p>
+          Now founding engineer at{" "}
+          <a class="inline-app" href="/work/pool"><AppIcon src={poolIcon} size={18} loading="eager" />Pool</a>{" "}
+          — the fastest way to save anything with a screenshot. Before that, three
+          years at{" "}
+          <a class="inline-app" href="/work/vk"><AppIcon src={vkIcon} size={18} loading="eager" />VK</a>{" "}
+          shipping a superapp to 100M+ people
+        </p>
+      </div>
+    </header>
+
+    <section class="section reveal" id="work" style="--i: 1" aria-labelledby="work-label">
+      <h2 class="label" id="work-label">Experience</h2>
+      <ol class="rows">
+        {
+          work.map((item) => (
+            <li>
+              <a class="row row-work" href={`/work/${item.id}`}>
+                <span class="row-meta">{item.data.period}</span>
+                <span class="row-body">
+                  <span class="row-title">
+                    {item.data.role} at{" "}
+                    {item.data.icon && (
+                      <AppIcon src={item.data.icon} size={18} transitionName={`icon-${item.id}`} />
+                    )}
+                    <span style={{ viewTransitionName: `title-${item.id}` }}>{item.data.title}</span>
+                  </span>
+                  <span class="row-summary">{item.data.summary}</span>
+                </span>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <section class="section reveal" id="projects" style="--i: 2" aria-labelledby="projects-label">
+      <h2 class="label" id="projects-label">Side projects</h2>
+      <ol class="rows">
+        {
+          projects.map((project) => (
+            <li>
+              <a class="row row-project" href={`/projects/${project.id}`}>
+                <AppIcon src={project.data.icon} size={40} transitionName={`icon-${project.id}`} />
+                <span class="row-body">
+                  <span class="row-title" style={{ viewTransitionName: `title-${project.id}` }}>
+                    {project.data.title}
+                  </span>
+                  <span class="row-summary">{project.data.summary}</span>
+                </span>
+                <span class="row-meta">{project.data.year}</span>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <section class="section reveal" id="writing" style="--i: 3" aria-labelledby="writing-label">
+      <h2 class="label" id="writing-label">Writing &amp; talks</h2>
+      <ol class="rows rows-compact">
+        {
+          notes.map((note) => (
+            <li>
+              <a
+                class="row row-note"
+                href={note.href}
+                target={note.external ? "_blank" : undefined}
+                rel={note.external ? "noopener" : undefined}
+              >
+                <span class="row-meta">{note.year}</span>
+                <span class="row-title">{note.title}</span>
+                <span class="row-end">
+                  {note.kind === "talk" && <span class="tag">talk</span>}
+                  <span class:list={["arrow", { "arrow-internal": !note.external }]} aria-hidden="true">
+                    {note.external ? "↗" : "→"}
+                  </span>
+                </span>
+              </a>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <section class="section reveal" id="contact" style="--i: 4" aria-labelledby="contact-label">
+      <h2 class="label" id="contact-label">Connect</h2>
+      <ul class="tiles" aria-label="Ways to reach me">
+        {connect.map((item) => (
+          <li>
+            {"text" in item ? (
+              <IconTile text={item.text} label={item.label} size={36} href={item.href} />
+            ) : (
+              <IconTile glyph={item.glyph} label={item.label} size={36} href={item.href} scale={item.scale} />
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+
+    <footer class="site-footer reveal" style="--i: 5">
+      <p class="label">
+        <span>© {new Date().getFullYear()} {profile.name}</span>
+        <a href={links.source} target="_blank" rel="noopener">Source</a>
+      </p>
+    </footer>
   </main>
 </Layout>
 
-<style>
-  main {
-    max-width: var(--max-width);
-    margin: 0 auto;
-    padding: 64px 24px;
-  }
-
-  @media (max-width: 480px) {
-    main {
-      padding: 32px 16px;
-    }
-  }
-</style>

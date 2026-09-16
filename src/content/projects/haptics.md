@@ -1,16 +1,19 @@
 ---
 title: Haptics
+year: "2024"
+summary: Real-time touch between friends. Featured by Spotted in Prod
+links:
+  - label: App Store
+    url: https://apps.apple.com/us/app/haptics-send-love-to-friends/id6503260004
+  - label: Spotted in Prod
+    url: https://x.com/spottedinprod/status/1847377048417030216
+  - label: X
+    url: https://x.com/hapticshq
+icon: ../../assets/icons/haptics.png
+order: 5
 ---
 
 
-# Haptics
+Haptics is an iOS app for real-time communication through touch, drawings, and expressive feedback. It was featured by Spotted in Prod and found an enthusiastic audience in the design community
 
----
-
-I developed and shipped Haptics, an iOS application that enables real-time communication between users through touch, drawings, and interactive feedback. The app was featured by the Spotted in Prod Twitter account and gained significant interest in design community
-
-Technical: custom highly optimised CoreAnimation drawing engine, Metal based visual effects, SpriteKit scenes, single source of truth mvvm based architecture
-
-- [X](https://x.com/hapticshq)
-- [AppStore](https://apps.apple.com/us/app/haptics-send-love-to-friends/id6503260004)
-- [Spotted in Prod](https://x.com/spottedinprod/status/1847377048417030216)
+Technical: a highly optimized Core Animation drawing engine, Metal-based visual effects, SpriteKit scenes, and a single-source-of-truth MVVM architecture

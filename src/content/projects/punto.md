@@ -1,12 +1,13 @@
 ---
 title: Punto
+year: "2025"
+summary: Fixes text typed in the wrong keyboard layout, Latin ↔ Cyrillic
+links:
+  - label: Raycast Store
+    url: https://www.raycast.com/red.avtovo/punto
+icon: ../../assets/icons/punto.png
+order: 4
 ---
 
 
-# Punto
-
----
-
-Raycast extension that switches keyboard layout of selected text between Latin and Cyrillic scripts. For when you accidentally type in the wrong language.
-
-[Raycast Store](https://www.raycast.com/red.avtovo/punto)
+Raycast extension that switches the keyboard layout of selected text between Latin and Cyrillic scripts. For when you accidentally type in the wrong language

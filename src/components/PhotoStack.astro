@@ -1,0 +1,88 @@
+---
+import { Image } from "astro:assets";
+import type { ImageMetadata } from "astro";
+
+/**
+ * A pile of photos and clips. Drop files into src/assets/me/ (jpg, png, webp, mp4, webm);
+ * they are sorted by filename, so prefix them to control order. Hover fans the pile out,
+ * a click sends the top card to the back.
+ */
+const images = import.meta.glob<{ default: ImageMetadata }>("../assets/me/*.{jpg,jpeg,png,webp}", {
+  eager: true,
+});
+const videos = import.meta.glob<string>("../assets/me/*.{mp4,webm}", {
+  eager: true,
+  query: "?url",
+  import: "default",
+});
+
+const cards = [
+  ...Object.entries(images).map(([path, module]) => ({ path, kind: "image" as const, src: module.default })),
+  ...Object.entries(videos).map(([path, src]) => ({ path, kind: "video" as const, src })),
+].sort((a, b) => a.path.localeCompare(b.path));
+
+interface Props {
+  width: number;
+  height: number;
+}
+
+const { width, height } = Astro.props;
+---
+
+<div
+  class="pile"
+  data-pile
+  role={cards.length > 1 ? "button" : undefined}
+  tabindex={cards.length > 1 ? 0 : undefined}
+  aria-label={cards.length > 1 ? "Photos of Ertem. Activate to shuffle." : "Photo of Ertem"}
+  style={{ "--w": `${width}px`, "--h": `${height}px`, "--n": cards.length }}
+>
+  {
+    cards.map((card, index) => (
+      <figure class="pile-card" data-i={index} style={{ "--i": index }}>
+        {card.kind === "image" ? (
+          <Image
+            src={card.src}
+            alt=""
+            width={width}
+            height={height}
+            densities={[1, 2, 3]}
+            loading={index === 0 ? "eager" : "lazy"}
+            decoding="async"
+          />
+        ) : (
+          <video src={card.src} autoplay muted loop playsinline aria-hidden="true" />
+        )}
+      </figure>
+    ))
+  }
+</div>
+
+<script>
+  const pile = document.querySelector<HTMLElement>("[data-pile]");
+  const cards = pile ? Array.from(pile.querySelectorAll<HTMLElement>(".pile-card")) : [];
+
+  if (pile && cards.length > 1) {
+    // Send the top card to the back; every other card moves one slot up.
+    const shuffle = () => {
+      const top = cards.find((card) => card.dataset.i === "0");
+      if (!top) return;
+      for (const card of cards) {
+        const next = card === top ? cards.length - 1 : Number(card.dataset.i) - 1;
+        card.dataset.i = String(next);
+        card.style.setProperty("--i", String(next));
+      }
+      top.classList.remove("is-shuffling");
+      void top.offsetWidth; // restart the animation when clicking quickly
+      top.classList.add("is-shuffling");
+    };
+
+    pile.addEventListener("click", shuffle);
+    pile.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        shuffle();
+      }
+    });
+  }
+</script>

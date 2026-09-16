@@ -1,14 +1,16 @@
 ---
 title: CoreImage
+year: "2023"
+event: VK × ITMO
+summary: From CPU-bound Accelerate filters to a single-pass CoreImage and Metal pipeline
+links:
+  - label: YouTube
+    url: https://www.youtube.com/watch?v=WytO_dmqr7s
+icon: ../../assets/icons/vk.png
+order: 1
 ---
 
 
-# CoreImage
+A talk about how we went from custom Accelerate-based image filters to Metal and CoreImage at VK
 
----
-
-A talk about how we went from custom Accelerate based image filters to Metal and CoreImage at VK.
-
-Covered the migration journey from CPU-bound Accelerate framework image processing to GPU-accelerated pipelines using Metal and CoreImage. The talk walks through performance bottlenecks in the original approach, the architecture of CoreImage's filter graph, and how Metal shaders integrate with the CoreImage pipeline for real-time image processing.
-
-- [YouTube](https://www.youtube.com/watch?v=WytO_dmqr7s)
+Covers the migration from CPU-bound Accelerate image processing to GPU-accelerated pipelines using Metal and CoreImage: the performance bottlenecks in the original approach, the architecture of CoreImage's filter graph, and how Metal shaders integrate with the CoreImage pipeline for real-time image processing

@@ -16,7 +16,7 @@ bun run deploy       # Build and deploy to Cloudflare Workers
 
 ## Architecture
 
-Personal site built with Astro, deployed as static assets on Cloudflare Workers. One dark, narrow column (39rem) in the spirit of tanvir.io: avatar, short first-person intro, experience, side projects, writing, stack, contact. Zero framework JavaScript.
+Personal site built with Astro, deployed as static assets on Cloudflare Workers. One dark, narrow column (39rem): avatar, short first-person intro, experience, side projects, writing, stack, contact. Zero framework JavaScript.
 
 ### Tech Stack
 - **Astro 7** - Static site generator with `output: 'static'`

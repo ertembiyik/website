@@ -2,7 +2,7 @@
 title: Kultura Records Store
 role: iOS engineer
 period: Jun 2021 — Oct 2022
-summary: Scan a barcode in the shop, preview the vinyl or cassette
+summary: Scan a record in the shop and listen to what is on it
 links:
   - label: kulturarecordstore.ru
     url: https://kulturarecordstore.ru

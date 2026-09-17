@@ -2,7 +2,7 @@
 title: Bluerage Software
 role: Founder
 period: Mar 2025 — Feb 2026
-summary: Personal software from prompts, then declarative agents
+summary: Personal software from prompts, pivoted to declarative agents
 links:
   - label: bluerage.software
     url: https://bluerage.software

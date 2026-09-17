@@ -52,12 +52,12 @@ Personal site built with Astro, deployed as static assets on Cloudflare Workers.
 ### Styling and motion
 - Global styles and CSS variables live in `src/styles/globals.css`
 - Dark-only theme, `#0a0a0a` background
-- Native cross-document view transitions: list rows morph into detail pages via matching `icon-<id>` / `title-<id>` names
+- `<ClientRouter />` (astro:transitions) swaps pages in place, so view transitions run without a document reload; a row's app icon and title morph into the detail heading via matching `icon-<id>` / `title-<id>` names on `.morph` inline-block boxes. Scripts bind on `astro:page-load`
 - Intro reveal plays once per session (`sessionStorage`), gated on `prefers-reduced-motion`
 - Hover states only under `(hover: hover) and (pointer: fine)`; 44px tap targets on touch
-- Client JavaScript is limited to the copy-email script on the home page (Copy button) and the photo pile shuffle
+- Client JavaScript is limited to the photo pile shuffle and the detail-page back link; both bind on `astro:page-load`
 - Copy style: no period at the end of a paragraph or summary; em dashes with spaces
+- Section titles are body-size Inter at weight 500 (no mono, no uppercase); dates are 13px tabular labels on the right of each row, years only on the index (`years()` in index.astro), full periods on detail pages
 
 ### Dev feedback (Agentation)
-- `src/dev/agentation.ts` mounts the [Agentation](https://agentation.com) toolbar with React; `Layout.astro` loads it through an inline module script only when `import.meta.env.DEV`, so React (a devDependency) never ships to production
-- `.mcp.json` registers `agentation-mcp server` (HTTP on :4747 + MCP on stdio) so annotations made in the browser reach the coding agent
+- `src/dev/agentation.ts` mounts the [Agentation](https://agentation.com) toolbar with React in copy-prompt mode (annotate, copy the markdown, paste it to the agent); it carries the toolbar's stylesheets through `astro:before-swap` and remounts on `astro:after-swap`. `Layout.astro` loads it through an inline module script only when `import.meta.env.DEV`, so React (a devDependency) never ships to production. No MCP server is configured

@@ -1,12 +1,14 @@
 ---
 /** A monochrome squircle tile with its name in a tooltip; optionally a link. Takes a glyph path or short text. */
 type Props = { label: string; size: number; href?: string; scale?: number } & (
-  | { glyph: string; text?: never }
-  | { text: string; glyph?: never }
+  | { glyph: string; stroke?: boolean; text?: never }
+  | { text: string; glyph?: never; stroke?: never }
 );
 
 const { label, size, href, scale = 1 } = Astro.props;
 const glyph = "glyph" in Astro.props ? Astro.props.glyph : undefined;
+// Stroked glyphs (Heroicons) are drawn at a weight that matches the filled brand marks.
+const stroke = "stroke" in Astro.props && Astro.props.stroke === true;
 const text = "text" in Astro.props ? Astro.props.text : undefined;
 const Tag = href ? "a" : "span";
 const external = href?.startsWith("http");
@@ -22,7 +24,19 @@ const external = href?.startsWith("http");
   style={{ "--size": `${size}px`, "--glyph-scale": scale }}
 >
   <span class="squircle squircle-glyph" aria-hidden="true">
-    {glyph ? <svg viewBox="0 0 24 24"><path d={glyph} fill="currentColor" /></svg> : text}
+    {
+      glyph ? (
+        <svg viewBox="0 0 24 24">
+          {stroke ? (
+            <path d={glyph} fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+          ) : (
+            <path d={glyph} fill="currentColor" />
+          )}
+        </svg>
+      ) : (
+        text
+      )
+    }
   </span>
   <span class="tile-name" aria-hidden="true">{label}</span>
 </Tag>

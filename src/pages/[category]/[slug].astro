@@ -31,7 +31,7 @@ export async function getStaticPaths() {
   }));
 }
 
-const { category, entry } = Astro.props as Props;
+const { entry } = Astro.props as Props;
 const { Content } = await render(entry);
 
 const meta =
@@ -47,7 +47,7 @@ const [primary, ...secondary] = entry.data.links;
 <Layout title={entry.data.title} description={entry.data.summary}>
   <main id="content" class="frame detail">
     <nav class="detail-nav" aria-label="Back">
-      <a class="back" href={`/#${category}`}>
+      <a class="back" href="/" data-back>
         <span class="back-arrow" aria-hidden="true">←</span>
         <AppIcon src={portrait} size={20} loading="eager" />
         {profile.name}
@@ -66,10 +66,9 @@ const [primary, ...secondary] = entry.data.links;
         )
       }
       <div class="detail-heading">
-        <h1 style={{ viewTransitionName: `title-${entry.id}` }}>{entry.data.title}</h1>
-        <p class="meta">{meta}</p>
+        <h1 class="morph" style={{ viewTransitionName: `title-${entry.id}` }}>{entry.data.title}</h1>
+        <p class="detail-meta">{meta}</p>
       </div>
-      <p class="detail-summary">{entry.data.summary}</p>
       <div class="chips">
         <a class="pill" href={primary.url} target="_blank" rel="noopener">
           {primary.label}
@@ -113,3 +112,18 @@ const [primary, ...secondary] = entry.data.links;
     </article>
   </main>
 </Layout>
+
+<script>
+  // Go back (scroll position intact) when the reader navigated here within the site; a direct
+  // visitor just goes home. The client router records its position as history.state.index.
+  function bindBack() {
+    const back = document.querySelector<HTMLAnchorElement>("[data-back]");
+    back?.addEventListener("click", (event) => {
+      if (typeof history.state?.index === "number" && history.state.index > 0) {
+        event.preventDefault();
+        history.back();
+      }
+    });
+  }
+  document.addEventListener("astro:page-load", bindBack);
+</script>

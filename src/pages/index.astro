@@ -11,6 +11,13 @@ import { connect, links, profile, writing } from "../data/site";
 const byOrder = <T extends { data: { order: number } }>(a: T, b: T) =>
   a.data.order - b.data.order;
 
+// "Feb 2026 — now" → "2026 – now"; "Aug 2022 — Nov 2025" → "2022 – 2025"; "Feb 2022 — Jul 2022" → "2022".
+// Full periods live on detail pages.
+const years = (period: string) => {
+  const parts = period.split(/\s*[—–-]\s*/).map((part) => part.match(/\d{4}/)?.[0] ?? part);
+  return [...new Set(parts)].join(" – ");
+};
+
 const [work, projects, speaking] = await Promise.all([
   getCollection("work").then((list) => list.sort(byOrder)),
   getCollection("projects").then((list) => list.sort(byOrder)),
@@ -53,23 +60,23 @@ const notes = [
     </header>
 
     <section class="section reveal" id="work" style="--i: 1" aria-labelledby="work-label">
-      <h2 class="label" id="work-label">Experience</h2>
+      <h2 class="section-title" id="work-label">Experience</h2>
       <ol class="rows">
         {
           work.map((item) => (
             <li>
               <a class="row row-work" href={`/work/${item.id}`}>
-                <span class="row-meta">{item.data.period}</span>
                 <span class="row-body">
                   <span class="row-title">
                     {item.data.role} at{" "}
                     {item.data.icon && (
                       <AppIcon src={item.data.icon} size={18} transitionName={`icon-${item.id}`} />
                     )}
-                    <span style={{ viewTransitionName: `title-${item.id}` }}>{item.data.title}</span>
+                    <span class="morph" style={{ viewTransitionName: `title-${item.id}` }}>{item.data.title}</span>
                   </span>
                   <span class="row-summary">{item.data.summary}</span>
                 </span>
+                <span class="row-date">{years(item.data.period)}</span>
               </a>
             </li>
           ))
@@ -78,7 +85,7 @@ const notes = [
     </section>
 
     <section class="section reveal" id="projects" style="--i: 2" aria-labelledby="projects-label">
-      <h2 class="label" id="projects-label">Side projects</h2>
+      <h2 class="section-title" id="projects-label">Side projects</h2>
       <ol class="rows">
         {
           projects.map((project) => (
@@ -86,12 +93,12 @@ const notes = [
               <a class="row row-project" href={`/projects/${project.id}`}>
                 <AppIcon src={project.data.icon} size={40} transitionName={`icon-${project.id}`} />
                 <span class="row-body">
-                  <span class="row-title" style={{ viewTransitionName: `title-${project.id}` }}>
-                    {project.data.title}
+                  <span class="row-title">
+                    <span class="morph" style={{ viewTransitionName: `title-${project.id}` }}>{project.data.title}</span>
                   </span>
                   <span class="row-summary">{project.data.summary}</span>
                 </span>
-                <span class="row-meta">{project.data.year}</span>
+                <span class="row-date">{years(project.data.year)}</span>
               </a>
             </li>
           ))
@@ -100,7 +107,7 @@ const notes = [
     </section>
 
     <section class="section reveal" id="writing" style="--i: 3" aria-labelledby="writing-label">
-      <h2 class="label" id="writing-label">Writing &amp; talks</h2>
+      <h2 class="section-title" id="writing-label">Writing &amp; talks</h2>
       <ol class="rows rows-compact">
         {
           notes.map((note) => (
@@ -111,10 +118,10 @@ const notes = [
                 target={note.external ? "_blank" : undefined}
                 rel={note.external ? "noopener" : undefined}
               >
-                <span class="row-meta">{note.year}</span>
                 <span class="row-title">{note.title}</span>
                 <span class="row-end">
                   {note.kind === "talk" && <span class="tag">talk</span>}
+                  <span class="row-date">{note.year}</span>
                   <span class:list={["arrow", { "arrow-internal": !note.external }]} aria-hidden="true">
                     {note.external ? "↗" : "→"}
                   </span>
@@ -127,14 +134,14 @@ const notes = [
     </section>
 
     <section class="section reveal" id="contact" style="--i: 4" aria-labelledby="contact-label">
-      <h2 class="label" id="contact-label">Connect</h2>
+      <h2 class="section-title" id="contact-label">Connect</h2>
       <ul class="tiles" aria-label="Ways to reach me">
         {connect.map((item) => (
           <li>
             {"text" in item ? (
               <IconTile text={item.text} label={item.label} size={36} href={item.href} />
             ) : (
-              <IconTile glyph={item.glyph} label={item.label} size={36} href={item.href} scale={item.scale} />
+              <IconTile glyph={item.glyph} stroke={item.stroke} label={item.label} size={36} href={item.href} scale={item.scale} />
             )}
           </li>
         ))}

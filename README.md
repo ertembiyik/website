@@ -15,7 +15,7 @@
   </a>
 </p>
 
-`website` is a content-driven personal site with a dark terminal aesthetic, visible markdown syntax, and static deployment through Cloudflare Workers assets.
+`website` is a content-driven personal site: typed Astro collections, Apple-squircle app icons, native view transitions, no framework JavaScript, and static deployment through Cloudflare Workers assets.
 
 ## Getting Started
 
@@ -36,9 +36,10 @@ Build the site locally:
 bun run build
 ```
 
-Lint the Astro and TypeScript source:
+Run Astro/TypeScript diagnostics and lint the source:
 
 ```bash
+bun run check
 bun run lint
 ```
 

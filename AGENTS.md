@@ -7,6 +7,8 @@ This file provides guidance to coding agents when working with code in this repo
 ```bash
 bun install          # Install dependencies
 bun run dev          # Start local development server
+bun run check        # Run Astro and TypeScript diagnostics
+bun run lint         # Lint Astro, TypeScript, and JavaScript
 bun run build        # Production build
 bun run preview      # Preview build locally via Wrangler
 bun run deploy       # Build and deploy to Cloudflare Workers
@@ -14,31 +16,48 @@ bun run deploy       # Build and deploy to Cloudflare Workers
 
 ## Architecture
 
-Personal portfolio/CV website built with Astro, deployed as static assets on Cloudflare Workers. Dark terminal aesthetic with visible markdown syntax.
+Personal site built with Astro, deployed as static assets on Cloudflare Workers. One dark, narrow column (39rem) in the spirit of tanvir.io: avatar, short first-person intro, experience, side projects, writing, stack, contact. Zero framework JavaScript.
 
 ### Tech Stack
-- **Astro 6** - Static site generator with `output: 'static'`
+- **Astro 7** - Static site generator with `output: 'static'`
 - **TypeScript** - Strict mode via Astro's tsconfig
+- **Astro Content Collections** - Typed Markdown-backed work, project, and speaking entries with `image()` icons
+- **astro:assets** - App icons and the avatar are optimized at build time (1x/2x/3x webp)
 - **Cloudflare Workers Assets** - Hosting via Wrangler asset deployment
-- **Ubuntu Sans Mono** - Monospace font from Google Fonts
+- **Inter Variable + Geist Mono Variable** - Self-hosted from fontsource packages, preloaded
 
 ### Content Structure
-- `src/content/site.md` - Main page content (YAML frontmatter + markdown)
-- `src/content/work/*.md` - Work experience entries (routed via `src/pages/work/[slug].astro`)
-- `src/content/projects/*.md` - Project entries (routed via `src/pages/projects/[slug].astro`)
-- Dynamic routes use Astro's `getStaticPaths()` for static generation
+- `src/data/site.ts` - Profile copy, links, external writing, and the Connect row (inline Simple Icons glyph paths)
+- `src/content/work/*.md` - Work experience entries (`role`, `period`, optional `icon`)
+- `src/content/projects/*.md` - Side project entries (`year`, `icon`)
+- `src/content/speaking/*.md` - Talks (`event`, `year`, `icon`)
+- Every entry has `links` (first one is the primary chip on its detail page) and optional `screens` (app screenshots rendered in iPhone frames); keep link lists out of Markdown bodies
+- `src/assets/me/` - Photos and clips for the hero pile, sorted by filename
+- `src/content.config.ts` - Schemas and glob loaders for all collections
+- `src/assets/icons/` - App icons and company logos referenced from frontmatter
+- Dynamic routes use `getStaticPaths()` and `render()` for static generation
 
 ### Data Flow
-1. `src/pages/index.astro` imports `site.md` via `rawContent()` for custom parsing
-2. `VisibleMarkdown.astro` parses raw markdown at build time, rendering with visible grayed-out syntax symbols
-3. Detail pages use progressive disclosure — short summaries on main page link to dedicated pages
+1. `src/pages/index.astro` queries typed collections with `getCollection()`
+2. Collection frontmatter supplies summaries, icons, and metadata for the index
+3. Markdown bodies render only on detail pages through the shared dynamic route
+4. Site-wide profile and writing data comes from `src/data/site.ts`
 
 ### Key Components
-- **VisibleMarkdown.astro** - Custom regex-based markdown renderer. Shows syntax symbols (##, ###, -, ---) grayed out while applying formatting. Differentiates internal vs external links.
-- **Layout.astro** - Shared layout wrapper
+- **AppIcon.astro** - Renders an image inside an Apple-style squircle (`corner-shape: squircle` with an SVG mask fallback) and optionally assigns a `view-transition-name`
+- **IconTile.astro** - Monochrome glyph in a squircle tile with a hover tooltip, used for the Connect row
+- **PhotoStack.astro** - The hero pile of photos/videos; hover fans it out, click sends the top card to the back
+- **Layout.astro** - Metadata, font preloads, and the once-per-session intro flag
 
-### Styling
-- Global styles and CSS variables in `src/styles/globals.css`
-- Dark-only theme (#0a0a0a background), no light mode
-- Zero client-side JavaScript — pure static HTML
-- Scoped styles in index.astro for layout
+### Styling and motion
+- Global styles and CSS variables live in `src/styles/globals.css`
+- Dark-only theme, `#0a0a0a` background
+- Native cross-document view transitions: list rows morph into detail pages via matching `icon-<id>` / `title-<id>` names
+- Intro reveal plays once per session (`sessionStorage`), gated on `prefers-reduced-motion`
+- Hover states only under `(hover: hover) and (pointer: fine)`; 44px tap targets on touch
+- Client JavaScript is limited to the copy-email script on the home page (Copy button) and the photo pile shuffle
+- Copy style: no period at the end of a paragraph or summary; em dashes with spaces
+
+### Dev feedback (Agentation)
+- `src/dev/agentation.ts` mounts the [Agentation](https://agentation.com) toolbar with React; `Layout.astro` loads it through an inline module script only when `import.meta.env.DEV`, so React (a devDependency) never ships to production
+- `.mcp.json` registers `agentation-mcp server` (HTTP on :4747 + MCP on stdio) so annotations made in the browser reach the coding agent

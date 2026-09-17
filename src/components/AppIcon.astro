@@ -1,0 +1,48 @@
+---
+import { Image } from "astro:assets";
+import type { ImageMetadata } from "astro";
+
+interface Props {
+  src: ImageMetadata;
+  alt?: string;
+  /** Rendered size in CSS pixels. Sets the intrinsic size to avoid layout shift. */
+  size: number;
+  class?: string;
+  transitionName?: string;
+  loading?: "eager" | "lazy";
+}
+
+const {
+  src,
+  alt = "",
+  size,
+  class: className,
+  transitionName,
+  loading = "lazy",
+} = Astro.props;
+
+// Always request the same variants (56/112/168px) no matter the rendered size, so an icon a
+// list row already loaded is cached when its detail page morphs it larger. Eager icons decode
+// synchronously so they are painted before a view transition captures the new page.
+const intrinsic = Math.max(size, 56);
+const decoding = loading === "eager" ? "sync" : "async";
+---
+
+<span
+  class:list={["squircle", className]}
+  style={{
+    "--size": `${size}px`,
+    ...(transitionName ? { viewTransitionName: transitionName } : {}),
+  }}
+  aria-hidden={alt === "" ? "true" : undefined}
+>
+  <Image
+    src={src}
+    alt={alt}
+    width={intrinsic}
+    height={intrinsic}
+    densities={[1, 2, 3]}
+    loading={loading}
+    decoding={decoding}
+  />
+</span>

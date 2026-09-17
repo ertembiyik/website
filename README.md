@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/favicon.svg" alt="website icon" width="96" />
+  <img src="public/favicon.png" alt="website icon" width="96" />
 </p>
 
 <h1 align="center">Website</h1>

@@ -59,10 +59,11 @@ const { width, height } = Astro.props;
 </div>
 
 <script>
-  const pile = document.querySelector<HTMLElement>("[data-pile]");
-  const cards = pile ? Array.from(pile.querySelectorAll<HTMLElement>(".pile-card")) : [];
+  function bindPile() {
+    const pile = document.querySelector<HTMLElement>("[data-pile]");
+    const cards = pile ? Array.from(pile.querySelectorAll<HTMLElement>(".pile-card")) : [];
+    if (!pile || cards.length < 2) return;
 
-  if (pile && cards.length > 1) {
     // Send the top card to the back; every other card moves one slot up.
     const shuffle = () => {
       const top = cards.find((card) => card.dataset.i === "0");
@@ -85,4 +86,5 @@ const { width, height } = Astro.props;
       }
     });
   }
+  document.addEventListener("astro:page-load", bindPile);
 </script>

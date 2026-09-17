@@ -2,7 +2,8 @@ import { defineCollection, type SchemaContext } from "astro:content";
 import { glob } from "astro/loaders";
 import { z } from "astro/zod";
 
-const link = z.object({ label: z.string(), url: z.url() });
+// Links render straight into href, so only web schemes are accepted.
+const link = z.object({ label: z.string(), url: z.url({ protocol: /^https?$/ }) });
 
 const entry = ({ image }: SchemaContext) => ({
   title: z.string(),

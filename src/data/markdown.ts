@@ -37,6 +37,9 @@ interface Collections {
   speaking: CollectionEntry<"speaking">[];
 }
 
+/** A Markdown document: blocks separated by a blank line, empty ones dropped, one final newline. */
+const markdownDocument = (blocks: readonly string[]) => `${blocks.filter((block) => block !== "").join("\n\n")}\n`;
+
 function sections({ work, projects, speaking }: Collections) {
   return [
     "## Experience",
@@ -55,27 +58,22 @@ function sections({ work, projects, speaking }: Collections) {
 
 /** llms.txt: H1, blockquote summary, then link lists (https://llmstxt.org/). */
 export const llmsTxt = (collections: Collections) =>
-  [
+  markdownDocument([
     `# ${profile.name}`,
     `> ${profile.description} Every page has a Markdown twin at <page URL>/index.md, and HTML pages answer \`Accept: text/markdown\`.`,
     `- [Home](${site}/index.md): intro, experience, side projects, writing, and contact`,
     sections(collections),
-    "",
-  ].join("\n\n");
+  ]);
 
 export const homeMarkdown = (collections: Collections) =>
-  [`# ${profile.name}`, intro, sections(collections), ""].join("\n\n");
+  markdownDocument([`# ${profile.name}`, intro, sections(collections)]);
 
 export const entryMarkdown = (category: Category, entry: Entry) =>
-  [
+  markdownDocument([
     `# ${entry.data.title}`,
     `${"role" in entry.data ? `${entry.data.role} · ` : ""}${when(entry)}`,
     entry.data.summary,
     entry.data.links.map((link) => `- [${link.label}](${link.url})`).join("\n"),
     (entry.body ?? "").trim(),
     `[← ${profile.name}](${site}/index.md)`,
-    "",
-  ]
-    .filter((part) => part !== "")
-    .concat("")
-    .join("\n\n");
+  ]);

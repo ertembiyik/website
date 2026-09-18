@@ -1,13 +1,21 @@
 {
   "name": "website",
   "compatibility_date": "2026-08-14",
+  // Production lives on ertembiyik.com only; the workers.dev copy would be a second, indexable
+  // site that skips the zone's rules. Per-version preview URLs stay on for pull requests.
+  "workers_dev": false,
+  "preview_urls": true,
   // Static assets serve everything. The Worker only sees page paths, where it answers
-  // `Accept: text/markdown` with the page's Markdown twin (src/worker.ts).
-  "main": "./src/worker.ts",
+  // `Accept: text/markdown` with the page's Markdown twin (worker/negotiate.ts).
+  "main": "./worker/index.ts",
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
     "run_worker_first": ["/", "/work/*", "/projects/*", "/speaking/*"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
   }
 }

@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "check": "astro check",
+    "check": "astro check && wrangler types worker/worker-configuration.d.ts > /dev/null && tsc -p worker && tsc -p worker/tsconfig.test.json",
+    "test": "bun test",
     "lint": "eslint \"**/*.{js,mjs,cjs,ts,mts,cts,astro}\"",
     "lint:fix": "eslint \"**/*.{js,mjs,cjs,ts,mts,cts,astro}\" --fix",
     "preview": "wrangler dev",
@@ -24,6 +25,7 @@
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@eslint/js": "^10.0.1",
+    "@types/bun": "^1.4.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@typescript-eslint/parser": "^8.58.2",

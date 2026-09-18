@@ -74,8 +74,7 @@ export const entryMarkdown = (category: Category, entry: Entry) =>
     entry.data.links.map((link) => `- [${link.label}](${link.url})`).join("\n"),
     (entry.body ?? "").trim(),
     `[← ${profile.name}](${site}/index.md)`,
-    "",
   ]
     .filter((part) => part !== "")
-    .concat("")
-    .join("\n\n");
+    .join("\n\n")
+    .concat("\n");

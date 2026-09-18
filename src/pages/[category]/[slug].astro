@@ -1,20 +1,13 @@
 ---
-import { getCollection, render, type CollectionEntry } from "astro:content";
+import type { GetStaticPaths, InferGetStaticPropsType } from "astro";
+import { getCollection, render } from "astro:content";
 import { Image } from "astro:assets";
 import AppIcon from "../../components/AppIcon.astro";
 import Layout from "../../layouts/Layout.astro";
 import portrait from "../../assets/me/01-ertem.jpg";
 import { profile } from "../../data/site";
 
-type Category = "work" | "projects" | "speaking";
-type Entry = CollectionEntry<Category>;
-
-interface Props {
-  category: Category;
-  entry: Entry;
-}
-
-export async function getStaticPaths() {
+export const getStaticPaths = (async () => {
   const [work, projects, speaking] = await Promise.all([
     getCollection("work"),
     getCollection("projects"),
@@ -29,9 +22,11 @@ export async function getStaticPaths() {
     params: { category, slug: entry.id },
     props: { category, entry },
   }));
-}
+}) satisfies GetStaticPaths;
 
-const { entry } = Astro.props as Props;
+type Props = InferGetStaticPropsType<typeof getStaticPaths>;
+
+const { entry } = Astro.props;
 const { Content } = await render(entry);
 
 const meta =

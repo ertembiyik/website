@@ -8,5 +8,18 @@
   Link: </llms.txt>; rel="describedby"; type="text/markdown"
   Link: </sitemap-index.xml>; rel="sitemap"; type="application/xml"
 
+# Pages answer `Accept: text/markdown` with their Markdown twin (worker/index.ts), so caches must
+# key both variants on Accept. Covers the HTML page and its index.md.
+/
+  Vary: Accept
+/index.md
+  Vary: Accept
+/work/*
+  Vary: Accept
+/projects/*
+  Vary: Accept
+/speaking/*
+  Vary: Accept
+
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable

@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
-    "check": "astro check",
+    "check": "astro check && wrangler types worker/worker-configuration.d.ts > /dev/null && tsc -p worker",
+    "test": "bun test",
     "lint": "eslint \"**/*.{js,mjs,cjs,ts,mts,cts,astro}\"",
     "lint:fix": "eslint \"**/*.{js,mjs,cjs,ts,mts,cts,astro}\" --fix",
     "preview": "wrangler dev",

@@ -1,6 +1,6 @@
-import type { APIRoute, GetStaticPaths } from "astro";
+import type { APIRoute, GetStaticPaths, InferGetStaticPropsType } from "astro";
 import { getCollection } from "astro:content";
-import { entryMarkdown, type Category } from "../../../data/markdown";
+import { entryMarkdown } from "../../../data/markdown";
 
 export const getStaticPaths = (async () => {
   const [work, projects, speaking] = await Promise.all([
@@ -18,9 +18,8 @@ export const getStaticPaths = (async () => {
   }));
 }) satisfies GetStaticPaths;
 
-export const GET: APIRoute = ({ props }) => {
-  const { category, entry } = props as { category: Category; entry: Parameters<typeof entryMarkdown>[1] };
-  return new Response(entryMarkdown(category, entry), {
+export const GET: APIRoute<InferGetStaticPropsType<typeof getStaticPaths>> = ({ props }) => {
+  return new Response(entryMarkdown(props.category, props.entry), {
     headers: { "Content-Type": "text/markdown; charset=utf-8" },
   });
 };

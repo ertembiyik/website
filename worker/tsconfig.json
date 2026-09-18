@@ -1,0 +1,16 @@
+{
+  // The Worker runs on workerd, not in a browser or Node: it is checked on its own against the
+  // runtime types `wrangler types` generates, apart from Astro's DOM-flavoured tsconfig.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": ["./worker-configuration.d.ts"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["index.ts", "accept.ts", "worker-configuration.d.ts"]
+}

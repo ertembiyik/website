@@ -50,10 +50,10 @@ const notes = [
         </p>
         <p>
           Now founding engineer at{" "}
-          <a class="inline-app" href="/work/pool"><AppIcon src={poolIcon} size={18} loading="eager" />Pool</a>{" "}
+          <a class="inline-app" href="/work/pool" data-morph-scope="intro"><AppIcon src={poolIcon} size={18} loading="eager" morph="icon-pool" /><span class="morph" data-morph="title-pool">Pool</span></a>{" "}
           — the fastest way to save anything with a screenshot. Before that, three
           years at{" "}
-          <a class="inline-app" href="/work/vk"><AppIcon src={vkIcon} size={18} loading="eager" />VK</a>{" "}
+          <a class="inline-app" href="/work/vk" data-morph-scope="intro"><AppIcon src={vkIcon} size={18} loading="eager" morph="icon-vk" /><span class="morph" data-morph="title-vk">VK</span></a>{" "}
           shipping a superapp to 100M+ people
         </p>
       </div>
@@ -65,14 +65,14 @@ const notes = [
         {
           work.map((item) => (
             <li>
-              <a class="row row-work" href={`/work/${item.id}`}>
+              <a class="row row-work" href={`/work/${item.id}`} data-morph-scope="row">
                 <span class="row-body">
                   <span class="row-title">
                     {item.data.role} at{" "}
                     {item.data.icon && (
-                      <AppIcon src={item.data.icon} size={18} transitionName={`icon-${item.id}`} />
+                      <AppIcon src={item.data.icon} size={18} morph={`icon-${item.id}`} />
                     )}
-                    <span class="morph" style={{ viewTransitionName: `title-${item.id}` }}>{item.data.title}</span>
+                    <span class="morph" data-morph={`title-${item.id}`}>{item.data.title}</span>
                   </span>
                   <span class="row-summary">{item.data.summary}</span>
                 </span>
@@ -90,11 +90,11 @@ const notes = [
         {
           projects.map((project) => (
             <li>
-              <a class="row row-project" href={`/projects/${project.id}`}>
-                <AppIcon src={project.data.icon} size={40} transitionName={`icon-${project.id}`} />
+              <a class="row row-project" href={`/projects/${project.id}`} data-morph-scope="row">
+                <AppIcon src={project.data.icon} size={40} morph={`icon-${project.id}`} />
                 <span class="row-body">
                   <span class="row-title">
-                    <span class="morph" style={{ viewTransitionName: `title-${project.id}` }}>{project.data.title}</span>
+                    <span class="morph" data-morph={`title-${project.id}`}>{project.data.title}</span>
                   </span>
                   <span class="row-summary">{project.data.summary}</span>
                 </span>

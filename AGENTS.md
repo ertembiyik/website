@@ -53,7 +53,7 @@ Personal site built with Astro, deployed as static assets on Cloudflare Workers.
 ### Styling and motion
 - Global styles and CSS variables live in `src/styles/globals.css`
 - Dark-only theme, `#0a0a0a` background
-- `<ClientRouter />` (astro:transitions) swaps pages in place, so view transitions run without a document reload; a row's app icon and title morph into the detail heading via matching `icon-<id>` / `title-<id>` names on `.morph` inline-block boxes. Scripts bind on `astro:page-load`
+- `<ClientRouter />` (astro:transitions) swaps pages in place, so view transitions run without a document reload; an entry's icon and title morph into the detail heading via `icon-<id>` / `title-<id>` names. Detail pages carry them statically; on the index several links can point at one entry (the intro sentence and its row), so candidates are marked with `data-morph` inside an `a[data-morph-scope]` and the script in `Layout.astro` assigns the names at navigation time to the link that was used, and restores them on that same link when coming back. Scripts bind on `astro:page-load`
 - Intro reveal plays once per session (`sessionStorage`), gated on `prefers-reduced-motion`
 - Hover states only under `(hover: hover) and (pointer: fine)`; 44px tap targets on touch
 - Client JavaScript is limited to the photo pile shuffle and the detail-page back link; both bind on `astro:page-load`

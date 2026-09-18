@@ -8,7 +8,10 @@ interface Props {
   /** Rendered size in CSS pixels. Sets the intrinsic size to avoid layout shift. */
   size: number;
   class?: string;
+  /** Static view-transition name (detail pages, where the element is unique). */
   transitionName?: string;
+  /** Candidate name on the index; Layout assigns it at navigation time to the link that was used. */
+  morph?: string;
   loading?: "eager" | "lazy";
 }
 
@@ -18,6 +21,7 @@ const {
   size,
   class: className,
   transitionName,
+  morph,
   loading = "lazy",
 } = Astro.props;
 
@@ -35,6 +39,7 @@ const decoding = loading === "eager" ? "sync" : "async";
     ...(transitionName ? { viewTransitionName: transitionName } : {}),
   }}
   aria-hidden={alt === "" ? "true" : undefined}
+  data-morph={morph}
 >
   <Image
     src={src}

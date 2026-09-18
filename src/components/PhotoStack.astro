@@ -32,7 +32,7 @@ const { width, height } = Astro.props;
 <div
   class="pile"
   data-pile
-  role={cards.length > 1 ? "button" : undefined}
+  role={cards.length > 1 ? "button" : "img"}
   tabindex={cards.length > 1 ? 0 : undefined}
   aria-label={cards.length > 1 ? "Photos of Ertem. Activate to shuffle." : "Photo of Ertem"}
   style={{ "--w": `${width}px`, "--h": `${height}px`, "--n": cards.length }}

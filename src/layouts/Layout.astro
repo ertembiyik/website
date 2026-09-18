@@ -3,7 +3,7 @@ import "../styles/globals.css";
 import { ClientRouter } from "astro:transitions";
 import interUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import geistMonoUrl from "@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2?url";
-import { profile } from "../data/site";
+import { links, profile } from "../data/site";
 
 interface Props {
   title: string;
@@ -15,6 +15,21 @@ const { title, description = profile.description, home = false } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const socialImage = new URL("/og.png", Astro.site);
 const pageTitle = home ? title : `${title} — ${profile.name}`;
+
+// Every page except the 404 has a Markdown twin for agents (see src/data/markdown.ts).
+const isNotFound = Astro.url.pathname.replace(/\/$/, "") === "/404";
+const markdownHref = isNotFound ? undefined : `${Astro.url.pathname.replace(/\/?$/, "/")}index.md`;
+
+const person = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: profile.name,
+  url: Astro.site?.href,
+  email: `mailto:${profile.email}`,
+  jobTitle: "Founding engineer",
+  worksFor: { "@type": "Organization", name: "Pool", url: "https://pool.day" },
+  sameAs: [links.x, links.github, links.linkedin, links.telegram],
+};
 
 // Inlined so the fonts start downloading before the stylesheet arrives. font-display: block (with the
 // preloads below) means a new document never paints fallback text and then swaps mid view transition.
@@ -37,6 +52,7 @@ const fontFaces = `
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="canonical" href={canonical} />
     <link rel="sitemap" href="/sitemap-index.xml" />
+    {markdownHref && <link rel="alternate" type="text/markdown" href={markdownHref} />}
     <link rel="preload" href={interUrl} as="font" type="font/woff2" crossorigin />
     <link rel="preload" href={geistMonoUrl} as="font" type="font/woff2" crossorigin />
 
@@ -56,6 +72,8 @@ const fontFaces = `
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={socialImage} />
+
+    {home && <script is:inline type="application/ld+json" set:html={JSON.stringify(person)} />}
 
     <style is:inline set:html={fontFaces}></style>
     {/* Same-document navigation: the next page is fetched and swapped in place, so the view

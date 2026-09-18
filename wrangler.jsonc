@@ -1,8 +1,13 @@
 {
   "name": "website",
   "compatibility_date": "2026-08-14",
+  // Static assets serve everything. The Worker only sees page paths, where it answers
+  // `Accept: text/markdown` with the page's Markdown twin (src/worker.ts).
+  "main": "./src/worker.ts",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "404-page"
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/", "/work/*", "/projects/*", "/speaking/*"]
   }
 }

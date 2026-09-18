@@ -10,6 +10,10 @@ export default defineConfig({
     enabled: false,
   },
   integrations: [sitemap()],
+  // The whole stylesheet is ~4 KB; inlining it removes the only render-blocking request.
+  build: {
+    inlineStylesheets: 'always',
+  },
   prefetch: {
     prefetchAll: true,
     defaultStrategy: 'viewport',

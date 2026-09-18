@@ -1,29 +1,23 @@
 import { describe, expect, test } from "bun:test";
-import worker from "./index";
+import { negotiate, type Assets } from "./negotiate";
 
 const ETAG = '"twin-v1"';
 
 /** Stands in for the static-assets binding: one page, its Markdown twin, and ETag revalidation. */
-const assets = {
-  ASSETS: {
-    async fetch(request: Request): Promise<Response> {
-      const { pathname } = new URL(request.url);
-      if (pathname === "/work/pool/") return new Response("<h1>Pool</h1>", { headers: { "Content-Type": "text/html" } });
-      if (pathname === "/work/pool/index.md") {
-        if (request.headers.get("If-None-Match") === ETAG) return new Response(null, { status: 304, headers: { ETag: ETAG } });
-        return new Response("# Pool\n", { headers: { "Content-Type": "text/markdown", "Content-Length": "7", ETag: ETAG } });
-      }
-      return new Response("not found", { status: 404 });
-    },
+const assets: Assets = {
+  async fetch(request: Request): Promise<Response> {
+    const { pathname } = new URL(request.url);
+    if (pathname === "/work/pool/") return new Response("<h1>Pool</h1>", { headers: { "Content-Type": "text/html" } });
+    if (pathname === "/work/pool/index.md") {
+      if (request.headers.get("If-None-Match") === ETAG) return new Response(null, { status: 304, headers: { ETag: ETAG } });
+      return new Response("# Pool\n", { headers: { "Content-Type": "text/markdown", "Content-Length": "7", ETag: ETAG } });
+    }
+    return new Response("not found", { status: 404 });
   },
 };
 
-// The handler is typed against workerd's Request, Env, and ExecutionContext. Bun supplies the
-// standard fetch classes, which is all the handler touches, so the test crosses that gap once here.
-const dispatch = worker.fetch as unknown as (request: Request, env: typeof assets) => Promise<Response>;
-
 const get = (path: string, headers: Record<string, string> = {}) =>
-  dispatch(new Request(`https://example.test${path}`, { headers }), assets);
+  negotiate(new Request(`https://example.test${path}`, { headers }), assets);
 
 describe("worker", () => {
   test("passes a browser request straight through", async () => {
@@ -53,7 +47,7 @@ describe("worker", () => {
   });
 
   test("never negotiates a write", async () => {
-    const response = await dispatch(
+    const response = await negotiate(
       new Request("https://example.test/work/pool/", { method: "POST", headers: { Accept: "text/markdown" } }),
       assets,
     );

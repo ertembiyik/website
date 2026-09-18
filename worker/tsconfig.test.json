@@ -1,0 +1,16 @@
+{
+  // Tests run on Bun, so they are checked against Bun's types. workerd's and Bun's globals cannot
+  // share one program, which is why ./negotiate sticks to web-standard APIs both declare.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": ["bun"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "include": ["accept.ts", "negotiate.ts", "*.test.ts"]
+}

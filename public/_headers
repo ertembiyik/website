@@ -4,6 +4,9 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Signal: search=yes, ai-input=yes, ai-train=no
+  Link: </llms.txt>; rel="describedby"; type="text/markdown"
+  Link: </sitemap-index.xml>; rel="sitemap"; type="application/xml"
 
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable

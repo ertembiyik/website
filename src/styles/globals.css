@@ -3,7 +3,7 @@
   --surface: #161616;
   --text: #ededed;
   --text-2: #a1a1a1;
-  --text-3: #666;
+  --text-3: #808080; /* 5:1 on --bg, 4.6:1 on --surface: the quietest tone that still passes AA */
   --line: rgb(255 255 255 / 0.09);
   --hover: rgb(255 255 255 / 0.045);
   --pressed: rgb(255 255 255 / 0.08);

@@ -1,6 +1,6 @@
 // Content negotiation for agents. An HTML page requested with `Accept: text/markdown` is answered
 // with its Markdown twin, which Astro builds at <page>/index.md. Every other request is handed to
-// static assets untouched: no header copy, no new Response.
+// static assets untouched. Neither path copies headers or builds a new Response.
 //
 // Only web-standard globals are used, so this module type-checks against workerd's runtime types
 // and against Bun's in the tests without a cast on either side.
@@ -25,11 +25,7 @@ export async function negotiate(request: Request, assets: Assets): Promise<Respo
 
   // The original request rides along, so conditional headers revalidate the twin itself.
   const twin = await assets.fetch(new Request(twinOf(request.url), request));
-  if (twin.status === 304) return twin;
-  if (!twin.ok) return assets.fetch(request);
-
-  // Stream the twin through; only the media type changes (assets serve .md without a charset).
-  const headers = new Headers(twin.headers);
-  headers.set("Content-Type", "text/markdown; charset=utf-8");
-  return new Response(twin.body, { status: twin.status, headers });
+  // The twin goes back as the asset layer produced it, body unread: public/_headers already gives
+  // every .md its charset and `Vary: Accept`. A 304 is the Markdown variant revalidating.
+  return twin.ok || twin.status === 304 ? twin : assets.fetch(request);
 }

@@ -63,7 +63,7 @@ Personal site built with Astro, deployed as static assets on Cloudflare Workers.
 - `src/dev/agentation.ts` mounts the [Agentation](https://agentation.com) toolbar with React in copy-prompt mode (annotate, copy the markdown, paste it to the agent); it carries the toolbar's stylesheets through `astro:before-swap` and remounts on `astro:after-swap`. `Layout.astro` loads it through an inline module script only when `import.meta.env.DEV`, so React (a devDependency) never ships to production. No MCP server is configured
 
 ### Agent readiness
-- `public/robots.txt` declares Content Signals (`search=yes, ai-input=yes, ai-train=no`) and names the AI crawlers; `public/_headers` repeats the signal as a response header and adds `Link` headers to `/llms.txt` and the sitemap
+- `public/robots.txt` declares Content Signals (`search=yes, ai-input=yes, ai-train=yes`) and names the AI crawlers; `public/_headers` repeats the signal as a response header and adds `Link` headers to `/llms.txt` and the sitemap
 - `src/data/markdown.ts` builds Markdown twins from the same collections: `/llms.txt`, `/index.md`, and `/<category>/<slug>/index.md` (endpoints under `src/pages/`); each HTML page links its twin with `<link rel="alternate" type="text/markdown">`
 - `src/worker.ts` answers `Accept: text/markdown` on page paths with the twin (`Vary: Accept`, `x-markdown-tokens`); `wrangler.jsonc` routes only `/`, `/work/*`, `/projects/*`, `/speaking/*` through it, so hashed assets stay on the free static path
 - The home page carries a schema.org `Person` JSON-LD block

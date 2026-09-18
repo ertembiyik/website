@@ -4,7 +4,7 @@
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  Content-Signal: search=yes, ai-input=yes, ai-train=no
+  Content-Signal: search=yes, ai-input=yes, ai-train=yes
   Link: </llms.txt>; rel="describedby"; type="text/markdown"
   Link: </sitemap-index.xml>; rel="sitemap"; type="application/xml"
 

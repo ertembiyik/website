@@ -10,7 +10,7 @@ const assets: Assets = {
     if (pathname === "/work/pool/") return new Response("<h1>Pool</h1>", { headers: { "Content-Type": "text/html" } });
     if (pathname === "/work/pool/index.md") {
       if (request.headers.get("If-None-Match") === ETAG) return new Response(null, { status: 304, headers: { ETag: ETAG } });
-      return new Response("# Pool\n", { headers: { "Content-Type": "text/markdown", "Content-Length": "7", ETag: ETAG } });
+      return new Response("# Pool\n", { headers: { "Content-Type": "text/markdown", ETag: ETAG } });
     }
     return new Response("not found", { status: 404 });
   },
@@ -31,7 +31,6 @@ describe("worker", () => {
       const response = await get(path, { Accept: "text/markdown" });
       expect(response.status).toBe(200);
       expect(response.headers.get("Content-Type")).toBe("text/markdown; charset=utf-8");
-      expect(response.headers.get("x-markdown-tokens")).toBe("2");
       expect(await response.text()).toBe("# Pool\n");
     }
   });

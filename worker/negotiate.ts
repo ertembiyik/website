@@ -28,11 +28,8 @@ export async function negotiate(request: Request, assets: Assets): Promise<Respo
   if (twin.status === 304) return twin;
   if (!twin.ok) return assets.fetch(request);
 
+  // Stream the twin through; only the media type changes (assets serve .md without a charset).
   const headers = new Headers(twin.headers);
   headers.set("Content-Type", "text/markdown; charset=utf-8");
-  // Same rough estimate Cloudflare's Markdown for Agents reports (~4 bytes per token), taken
-  // from the asset's length so the body streams through without being read.
-  const bytes = Number(twin.headers.get("Content-Length"));
-  if (Number.isFinite(bytes) && bytes > 0) headers.set("x-markdown-tokens", String(Math.ceil(bytes / 4)));
   return new Response(twin.body, { status: twin.status, headers });
 }

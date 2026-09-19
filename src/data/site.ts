@@ -1,8 +1,7 @@
 export const profile = {
   name: "Ertem Biyik",
   handle: "ertem",
-  description:
-    "Ertem Biyik makes apps for Apple platforms and hacks on what's underneath them. Founding engineer at Pool.",
+  description: "Founding engineer at Pool. I build iOS apps, poke at what's underneath them, and skate",
   email: "hi@ertembiyik.com",
 } as const;
 

@@ -60,7 +60,7 @@ function sections({ work, projects, speaking }: Collections) {
 export const llmsTxt = (collections: Collections) =>
   markdownDocument([
     `# ${profile.name}`,
-    `> ${profile.description} Every page has a Markdown twin at <page URL>/index.md, and HTML pages answer \`Accept: text/markdown\`.`,
+    `> ${profile.description}. Every page has a Markdown twin at <page URL>/index.md, and HTML pages answer \`Accept: text/markdown\`.`,
     `- [Home](${site}/index.md): intro, experience, side projects, writing, and contact`,
     sections(collections),
   ]);

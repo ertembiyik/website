@@ -1,7 +1,7 @@
 ---
 title: CoreImage
-year: "2023"
-event: VK × ITMO
+year: "2024"
+event: "Coffee&Code × VKontakte TechBrew #4"
 summary: From CPU-bound Accelerate filters to a single-pass CoreImage and Metal pipeline
 links:
   - label: YouTube

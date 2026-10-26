@@ -13,7 +13,7 @@ order: 3
 
 ## Mini Apps
 
-- Mini Apps platform: WebView-based apps with a bridge to native code through JavaScriptCore message handlers
+- Mini Apps platform: WebView-based apps with a bridge to native code through WebKit's WKScriptMessageHandler
 - Mini Apps Catalog and discovery
 - Mini Apps advertising system
 
@@ -33,7 +33,7 @@ order: 3
 - Migrated the iOS app to Tuist, modularizing the codebase into 300+ modules
 - Design system: played a key role in developing and refining VK's design system (VKUI)
 - Optimized image filters by moving from Accelerate to CoreImage and reducing the render pipeline to a single pass
-- Analyzed app startup bottlenecks and implemented improvements, reducing app launch time by 8%
+- Analyzed app startup bottlenecks and implemented improvements, reducing p90 app launch time by 8%
 
 ## AI
 

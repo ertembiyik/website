@@ -6,7 +6,7 @@ links:
   - label: Raycast Store
     url: https://www.raycast.com/ertem_biyik/ios-resolution
 icon: ../../assets/icons/ios-resolution.png
-order: 3
+order: 4
 ---
 
 

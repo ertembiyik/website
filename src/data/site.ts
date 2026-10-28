@@ -17,6 +17,11 @@ export const links = {
 
 export const writing = [
   {
+    title: "Haptics goes open source",
+    year: "2026",
+    href: "https://www.spottedinprod.com/blog/haptics-goes-open-source",
+  },
+  {
     title: "I built a tool that lets you point at iOS views and tell AI what to change",
     year: "2026",
     href: "https://x.com/ertembiyik/status/2019811409048244312",

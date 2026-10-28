@@ -2,7 +2,7 @@
 title: Bluerage Software
 role: Founder
 period: Mar 2025 — Feb 2026
-summary: Personal software from prompts, pivoted to declarative agents
+summary: Prompt-to-mini-app platform, pivoted to an agent-driven take on Apple Shortcuts
 links:
   - label: bluerage.software
     url: https://bluerage.software
@@ -21,4 +21,4 @@ We worked closely with [Z Fellows](https://zfellows.com) while exploring the ide
 
 We then pivoted from an iOS app to a Telegram bot built around the existing Telegram Mini Apps platform
 
-After a few iterations, I explored an open-source, mobile-first automation tool that could think and act across your tools: an agentic take on Apple Shortcuts
+After a few iterations, I explored an open-source, mobile-first automation tool that could think and act across your tools: an agent-driven take on Apple Shortcuts. Along the way I [contributed a fix](https://github.com/openai/openai-agents-js/pull/499) to OpenAI's Agents SDK for non-OpenAI models that call tools with empty arguments

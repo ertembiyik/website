@@ -181,11 +181,25 @@ const art = cells
     /** Occupied columns per row at rest, for where the hand meets the plant. */
     extent: Map<number, [number, number]>;
     omega: number;
-    bend: number;
-    velocity: number;
+    /** Rows of stem from the ground up to the head. */
+    length: number;
+    /** The head's sideways offset (columns) and speed. Next to it the stem weighs nothing, so its shape follows. */
+    y: number;
+    v: number;
+    /** The loads bending the stem, from the head and from the hand at height `at`: they give its shape. */
+    load: number;
+    push: number;
+    at: number;
+    /** Where the hand holds the stem at `at`, easing toward the hand so a landing finger doesn't jump it. */
+    held: number;
+    touching: boolean;
     /** Side the hand pushes from (1: from the left), 0 when untouched. */
     side: number;
     slipping: boolean;
+    /** Per row: what's left of the stem's quick whip home after the hand lets go, and its speed. */
+    whip: Float32Array;
+    whipSpeed: Float32Array;
+    whipping: boolean;
   };
   type Bee = { col: number; row: number; vc: number; vr: number; target: number; until: number; phase: number; trail: Spot[]; dropped: number };
 
@@ -198,8 +212,13 @@ const art = cells
   const waveSpeed = 55;
   const waveDamping = 1.6;
   const waveSettle = 6;
-  // The hand's reach past its point, in columns.
+  // The hand's reach past its point, in columns, and how quickly (seconds) the point where it holds a stem
+  // catches up with it, so pointer events arriving in steps move the stem smoothly.
   const handRadius = 1.4;
+  const grip = 0.015;
+  // A released stem whips back home at this rate (radians a second) and damping ratio.
+  const whipRate = 38;
+  const whipDamping = 0.3;
   // How far (columns) a flower head is pushed before it slips off the hand.
   const maxBend = 5;
   // A gust rolls across the bed for `gustRun` seconds out of every `gustCycle`.
@@ -210,7 +229,7 @@ const art = cells
   // The glow: blur radius and its brightness when added over the art.
   const glowBlur = 3;
   const glowStrength = 0.32;
-  // Instance layout: column, row, glyph, r, g, b, plant (-1 foliage, -2 placed freely), give, backed, alpha.
+  // Instance layout: column, row, glyph, r, g, b, plant (-1 foliage, -2 placed freely), give (a plant's head row), backed, alpha.
   const stride = 10;
   // Untouched, frames come from a timer at this rate instead of polling every display frame.
   const idleFps = 24;
@@ -220,8 +239,10 @@ const art = cells
 
   const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
   const wrap = (value: number, size: number) => ((value % size) + size) % size;
+  // A cantilever rooted at the ground: how far height `s` moves under a unit load at height `c`.
+  const flex = (s: number, c: number) => (s <= c ? (s * s * (3 * c - s)) / 6 : (c * c * (3 * s - c)) / 6);
 
-  // Every glyph is one instance of a quad. The vertex shader moves it by its plant's bend (or the wave
+  // Every glyph is one instance of a quad. The vertex shader moves it by its plant's offset at its row (or the wave
   // field, for foliage) read from a small float texture, and snaps it to device pixels so atlas texels
   // land 1:1 and the characters stay crisp.
   const vertexSource = `#version 300 es
@@ -251,9 +272,10 @@ const art = cells
       float offset = 0.0;
       float drop = 0.0;
       if (a_plant >= 0.0) {
-        float bend = texelFetch(u_state, ivec2(int(a_plant), 1), 0).r;
-        offset = bend * a_give;
-        drop = bend * bend * 0.015 * a_give;
+        offset = texelFetch(u_state, ivec2(int(a_plant), 1 + int(a_cell.y)), 0).r;
+        // The head dips on its arc as one piece, by how far the top of the stem leans.
+        float base = texelFetch(u_state, ivec2(int(a_plant), 1 + int(max(a_cell.y, a_give))), 0).r;
+        drop = base * base * 0.015;
       } else if (a_plant > -1.5) {
         offset = texelFetch(u_state, ivec2(int(a_cell.x), 0), 0).r * a_give;
       }
@@ -414,6 +436,7 @@ const art = cells
       const cells = read.filter((_, i) => owners[i] === index);
       const petals = cells.filter((cell) => flowerAt(cell.row * cols + cell.col) >= 0);
       const crown = Math.min(...cells.map((cell) => cell.row));
+      const head = petals.length ? Math.max(...petals.map((cell) => cell.row)) : crown;
       const centre = cells.reduce((sum, cell) => sum + cell.col, 0) / cells.length;
       const extent = new Map<number, [number, number]>();
       for (const cell of cells) {
@@ -423,20 +446,36 @@ const art = cells
       return {
         cells,
         crown,
-        head: petals.length ? Math.max(...petals.map((cell) => cell.row)) : crown,
+        head,
         centre,
         extent,
         omega: (2 * Math.PI) / (periods[0]! + (periods[1]! - periods[0]!) * (0.5 + 0.5 * Math.sin(centre * 0.04))),
-        bend: 0,
-        velocity: 0,
+        length: Math.max(2, ground - head),
+        y: 0,
+        v: 0,
+        load: 0,
+        push: 0,
+        at: 0,
+        held: 0,
+        touching: false,
         side: 0,
         slipping: false,
+        whip: new Float32Array(rows),
+        whipSpeed: new Float32Array(rows),
+        whipping: false,
       };
     });
     const order = [...plants].sort((a, b) => b.cells.length - a.cells.length);
-    // How much of the head's movement a row takes: the head moves as one piece, the stem bends to the root.
-    const giveAt = (plant: Plant, at: number) =>
-      at <= plant.head ? 1 : Math.pow(clamp((ground - at) / Math.max(3, ground - plant.head), 0, 1), 1.4);
+    // How far a plant sits from rest at height `s` above the ground: the stem's shape under its loads, then the
+    // head, which rides the tip of the stem and tilts with it.
+    const bend = (plant: Plant, s: number) => {
+      const { length, load, push, at } = plant;
+      if (s < length) return load * flex(s, length) + push * flex(s, at);
+      return plant.y + ((load * length * length + push * at * at) / 2) * (s - length);
+    };
+    const offsetAt = (plant: Plant, r: number) => bend(plant, ground - r) + plant.whip[r]!;
+    // How much further than the top of a freely bent stem height `s` on the head moves, as the head tilts.
+    const lever = (plant: Plant, s: number) => 1 + (1.5 * (s - plant.length)) / plant.length;
     const foliageTop = Math.min(ground, ...foliage.map((cell) => cell.row));
     const foliageGive = (at: number) => 0.7 * Math.pow(clamp((ground - at) / Math.max(3, ground - foliageTop), 0, 1), 1.5);
 
@@ -452,14 +491,15 @@ const art = cells
     for (const cell of foliage) instance(instances, count++, cell, -1, foliageGive(cell.row), false);
     for (const plant of order) {
       const index = plants.indexOf(plant);
-      for (const cell of plant.cells) instance(instances, count++, cell, index, giveAt(plant, cell.row), cell.row <= plant.head);
+      for (const cell of plant.cells) instance(instances, count++, cell, index, plant.head, cell.row <= plant.head);
     }
     // Bees: a body, two wings and a short trail each.
     const maxBees = 3;
     const beeSlots = maxBees * 7;
     const beeData = new Float32Array(beeSlots * stride);
+    // The per-frame state for the shader: row 0 holds the wave field, rows 1… every plant's offset per row.
     const stateWidth = Math.max(cols, plants.length);
-    const state = new Float32Array(stateWidth * 2);
+    const stems = new Float32Array(plants.length * rows);
 
     canvas.className = "garland-canvas";
     host.append(canvas);
@@ -523,7 +563,7 @@ const art = cells
       gl.bindBuffer(gl.ARRAY_BUFFER, beeBuffer);
       gl.bufferData(gl.ARRAY_BUFFER, beeData.byteLength, gl.DYNAMIC_DRAW);
       const stateTexture = texture();
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, stateWidth, 2, 0, gl.RED, gl.FLOAT, state);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, stateWidth, rows + 1, 0, gl.RED, gl.FLOAT, new Float32Array(stateWidth * (rows + 1)));
       const uniforms = Object.fromEntries(
         ["u_state", "u_atlas", "u_cell", "u_slot", "u_lead", "u_slotColumns", "u_atlasSize", "u_view", "u_origin", "u_background", "u_glow", "u_fade"].map((name) => [
           name,
@@ -646,7 +686,7 @@ const art = cells
         }
         const plant = plants[bee.target]!;
         // Hovering circles the flower head; as the meadow rests, the bee settles onto it.
-        const aimCol = plant.centre + plant.bend + Math.cos(t * 1.3 + bee.phase) * 3.2 * lively;
+        const aimCol = plant.centre + plant.y + Math.cos(t * 1.3 + bee.phase) * 3.2 * lively;
         const aimRow = plant.crown - 0.6 - (0.6 - Math.sin(t * 1.9 + bee.phase) * 1.4) * lively;
         let ac = (aimCol - bee.col) * 5 - bee.vc * 2.4 + Math.sin(t * 7.3 + bee.phase * 3) * 7 * lively;
         let ar = (aimRow - bee.row) * 5 - bee.vr * 2.4 + Math.cos(t * 6.1 + bee.phase) * 4 * lively;
@@ -698,12 +738,14 @@ const art = cells
       const origin = box.getBoundingClientRect().left - host.getBoundingClientRect().left;
       view = { origin, first: -origin / advance, last: (canvas.width / ratio - origin) / advance };
 
-      // The only per-frame upload: the wave field and every plant's bend, a few hundred floats.
-      state.set(field, 0);
-      plants.forEach((plant, i) => (state[stateWidth + i] = plant.bend));
+      // The only per-frame upload: the wave field and each plant's offset per row, a few thousand floats.
+      plants.forEach((plant, i) => {
+        for (let r = plant.crown; r <= ground; r++) stems[r * plants.length + i] = offsetAt(plant, r);
+      });
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, stateTexture);
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, stateWidth, 2, gl.RED, gl.FLOAT, state);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, cols, 1, gl.RED, gl.FLOAT, field);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 1, plants.length, rows, gl.RED, gl.FLOAT, stems);
       const beeCount = placeBees(t);
       gl.bindBuffer(gl.ARRAY_BUFFER, beeBuffer);
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, beeData);
@@ -745,18 +787,19 @@ const art = cells
       gl.bindVertexArray(null);
     };
 
-    // Where the hand holds a plant this step, if it is pressing on it: at the height it touches, the
-    // plant's edge sits right at the hand. It can push but never pull.
+    // Whether the hand is at a plant this step, and at what height: where the plant would have to be there for
+    // its edge to sit at the hand. It can push, never pull.
     const press = (plant: Plant) => {
-      const reach = hand ? plant.extent.get(Math.round(hand.row)) : undefined;
-      const give = hand ? giveAt(plant, hand.row) : 0;
-      if (!hand || !reach || give < 0.05) {
+      const row = hand ? Math.round(hand.row) : ground;
+      const reach = plant.extent.get(row);
+      if (!hand || !reach || row >= ground) {
         plant.side = 0;
         plant.slipping = false;
         return undefined;
       }
-      const left = reach[0] + plant.bend * give;
-      const right = reach[1] + 1 + plant.bend * give;
+      const offset = offsetAt(plant, row);
+      const left = reach[0] + offset;
+      const right = reach[1] + 1 + offset;
       if (hand.col < left - handRadius - 1 || hand.col > right + handRadius + 1) {
         plant.side = 0;
         plant.slipping = false;
@@ -764,13 +807,16 @@ const art = cells
       }
       if (plant.slipping || hand.col < left - handRadius || hand.col > right + handRadius) return undefined;
       plant.side ||= hand.col < (left + right) / 2 ? 1 : -1;
-      const goal = plant.side > 0 ? (hand.col + handRadius - reach[0]) / give : (hand.col - handRadius - reach[1] - 1) / give;
-      if (Math.abs(goal) > maxBend) {
+      const goal = plant.side > 0 ? hand.col + handRadius - reach[0] : hand.col - handRadius - reach[1] - 1;
+      // Height above the ground. Lower down, the stem is stiffer and a small push swings the head far: past what
+      // would take the head beyond maxBend, the hand slips off.
+      const s = ground - row;
+      const { length } = plant;
+      if (Math.abs(goal) > maxBend * (s < length ? flex(s, s) / flex(length, s) : lever(plant, s))) {
         plant.slipping = true;
         return undefined;
       }
-      const pushing = plant.side > 0 ? goal > plant.bend : goal < plant.bend;
-      return pushing ? { goal, give } : undefined;
+      return { s, goal };
     };
 
     const step = (t: number, h: number) => {
@@ -782,19 +828,84 @@ const art = cells
       for (let i = 0; i < cols; i++) field[i]! += fieldVelocity[i]! * h;
 
       for (const plant of plants) {
+        const { length } = plant;
         const w = plant.omega;
-        const force = -w * w * (plant.bend - fieldAt(plant.centre)) - 2 * (1 - bounce) * w * plant.velocity;
-        plant.velocity += force * h;
-        plant.bend = clamp(plant.bend + plant.velocity * h, -maxBend * 1.3, maxBend * 1.3);
-        // Contact is a constraint, not a spring: a pressed plant's edge is placed at the hand and moves at
-        // its speed, so nothing trails behind it. Slip off or let go and it keeps that speed, springing back.
-        const held = press(plant);
-        if (held && hand) {
-          plant.bend = held.goal;
-          plant.velocity = Math.max(0, (hand.speed / held.give) * plant.side) * plant.side;
-          // The push travels on through the field to the neighbours.
-          kick(plant.centre, () => hand!.speed * 0.01, 5);
+        // The stem holds its head with a cantilever's stiffness, and the wind pushes on the head.
+        const tip = flex(length, length);
+        const mass = 1 / (tip * w * w);
+        let stiffness = 1 / tip;
+        let pull = fieldAt(plant.centre) / tip;
+        const touch = press(plant);
+        const was = plant.touching;
+        if (!touch) plant.touching = false;
+        else if (!plant.touching && plant.side * (touch.goal - bend(plant, touch.s)) > 0) {
+          plant.touching = true;
+          plant.held = bend(plant, touch.s);
         }
+        let low = 0;
+        let cross = 0;
+        let det = 1;
+        if (touch && plant.touching) {
+          plant.held += (touch.goal - plant.held) * (1 - Math.exp(-h / grip));
+          if (touch.s < length) {
+            // Held partway up, the stem is a propped cantilever: stiffer, and pulling the head toward the hand.
+            low = flex(touch.s, touch.s);
+            cross = flex(length, touch.s);
+            det = tip * low - cross * cross;
+            stiffness = low / det;
+            pull += (cross / det) * plant.held;
+          }
+        }
+        // Implicit in the stiffness, so a hand holding the stem just under the head stays steady.
+        let speed = (plant.v + (h * (pull - stiffness * plant.y)) / mass) / (1 + 2 * (1 - bounce) * w * h + (h * h * stiffness) / mass);
+        // A hand on the head holds it where it is as long as the stem presses back against it.
+        if (touch && plant.touching && touch.s >= length) {
+          const goal = plant.held / lever(plant, touch.s);
+          const ahead = plant.side * (plant.y + speed * h - goal);
+          if (ahead < 0) speed = (goal - plant.y) / h;
+          // Pointer events come in steps, so the head runs a hair ahead between them without leaving the hand.
+          else if (ahead > 0.25) plant.touching = false;
+        }
+        // No faster than a head swings through rest from full bend, however fast the hand flicks it.
+        plant.v = clamp(speed, -maxBend * w, maxBend * w);
+        plant.y = clamp(plant.y + plant.v * h, -maxBend * 1.5, maxBend * 1.5);
+        let load = plant.y / tip;
+        let push = 0;
+        let at = 0;
+        if (touch && plant.touching && touch.s < length) {
+          const pressing = (tip * plant.held - cross * plant.y) / det;
+          // The hand lets go once the stem stops pressing on it.
+          if (plant.side * pressing > 0) {
+            load = (low * plant.y - cross * plant.held) / det;
+            push = pressing;
+            at = touch.s;
+          } else plant.touching = false;
+        }
+        // Let go, the stem springs back from where it was instead of jumping there.
+        const released = was && !plant.touching;
+        if (released) for (let r = plant.crown; r <= ground; r++) plant.whip[r]! += bend(plant, ground - r);
+        plant.load = load;
+        plant.push = push;
+        plant.at = at;
+        if (released) {
+          for (let r = plant.crown; r <= ground; r++) plant.whip[r]! -= bend(plant, ground - r);
+          plant.whipping = true;
+        }
+        if (plant.whipping) {
+          let moving = false;
+          for (let r = plant.crown; r <= ground; r++) {
+            plant.whipSpeed[r]! -= (whipRate * whipRate * plant.whip[r]! + 2 * whipDamping * whipRate * plant.whipSpeed[r]!) * h;
+            plant.whip[r]! += plant.whipSpeed[r]! * h;
+            moving ||= Math.abs(plant.whip[r]!) > 0.005 || Math.abs(plant.whipSpeed[r]!) > 0.05;
+          }
+          if (!moving) {
+            plant.whip.fill(0);
+            plant.whipSpeed.fill(0);
+            plant.whipping = false;
+          }
+        }
+        // The push travels on through the field to the neighbours.
+        if (plant.touching && hand) kick(plant.centre, () => hand!.speed * 0.01, 5);
       }
       fly(t, h);
     };
@@ -807,7 +918,7 @@ const art = cells
 
     const still = () =>
       lively < 0.02 &&
-      plants.every((plant) => Math.abs(plant.bend) < 0.01 && Math.abs(plant.velocity) < 0.01) &&
+      plants.every((plant) => Math.abs(plant.y) < 0.01 && Math.abs(plant.v) < 0.01 && !plant.whipping) &&
       field.every((value, i) => Math.abs(value) < 0.01 && Math.abs(fieldVelocity[i]!) < 0.01) &&
       bees.every((bee) => Math.abs(bee.vc) < 0.05 && Math.abs(bee.vr) < 0.05);
 

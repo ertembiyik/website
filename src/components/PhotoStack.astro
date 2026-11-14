@@ -127,7 +127,6 @@ const { width, height } = Astro.props;
   const liftDuration = 200;
   const perspective = 640;
   const spinSpeed = (2 * Math.PI) / 48;
-  const rubberCoefficient = 0.55;
   // UIScrollView's normal deceleration: a release at v px/ms comes to rest v·d/(1−d) px further on.
   const decelerationRate = 0.998;
   const project = (velocity: number) => (velocity * decelerationRate) / (1 - decelerationRate);
@@ -137,15 +136,6 @@ const { width, height } = Astro.props;
   const zeroPose = (): Pose => ({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, s: 0, shade: 0 });
   const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-  // UIScrollView's rubber band: a pull of x against a view `dimension` wide moves the card
-  // c·x·d / (d + c·x), resisting from the first pixel and harder the further it goes. Returns the
-  // card offset and the curve's slope there, so a release hands the spring a matching velocity.
-  const rubberBand = (drag: number, dimension: number): [offset: number, slope: number] => {
-    const pull = Math.abs(drag);
-    const stretch = dimension + rubberCoefficient * pull;
-    return [(Math.sign(drag) * rubberCoefficient * pull * dimension) / stretch, (rubberCoefficient * dimension ** 2) / stretch ** 2];
-  };
-
   function bindPile(signal: AbortSignal) {
     const pile = document.querySelector<HTMLElement>("[data-pile]");
     const elements = pile ? Array.from(pile.querySelectorAll<HTMLElement>(".pile-card")) : [];
@@ -154,14 +144,16 @@ const { width, height } = Astro.props;
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
     const finePointer = matchMedia("(hover: hover) and (pointer: fine)");
     const count = elements.length;
-    // A swiped card follows the finger 1:1 for a quarter of its width, then stretches on UIScrollView's rubber band,
-    // reckoned against the card's own width so it never travels much more than one card.
-    const freeDrag = () => pile.offsetWidth / 4;
+    // A swiped card follows the finger 1:1 for half its width, then stretches toward a stop just past the pile's edge,
+    // giving less the further it goes (smoothly: it leaves the 1:1 stretch at the same speed), so it peeks out from
+    // the stack and no further.
+    const freeDrag = () => pile.offsetWidth / 2;
     const follow = (drag: number): [offset: number, slope: number] => {
       const free = freeDrag();
+      const room = pile.offsetWidth * 1.2 - free;
       if (Math.abs(drag) <= free) return [drag, 1];
-      const [extra, slope] = rubberBand(drag - Math.sign(drag) * free, pile.offsetWidth * 0.9);
-      return [Math.sign(drag) * free + extra, slope];
+      const give = Math.exp(-(Math.abs(drag) - free) / room);
+      return [Math.sign(drag) * (free + room * (1 - give)), give];
     };
 
     const slotOf = (card: Card) => Number(card.el.dataset.i);

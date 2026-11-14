@@ -43,6 +43,10 @@ html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  /* iPhone Safari otherwise inflates small text it thinks is unreadable, which blew the garland's 4px glyphs up and
+     left its box taller and wider than the flowers drawn into it. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -523,8 +527,9 @@ h3 {
   justify-content: center;
   width: 100vw;
   margin-inline: calc(50% - 50vw);
-  margin-bottom: -2.25rem;
-  overflow: hidden;
+  /* The meadow's ground rests on the footer's hairline. */
+  margin-bottom: -3.5rem;
+  overflow-x: clip;
   container-type: inline-size;
   user-select: none;
   touch-action: pan-y;
@@ -534,21 +539,25 @@ h3 {
 .garland-art {
   position: relative;
   flex: none;
-}
-
-.garland pre {
-  margin: 0;
   font-family: var(--font-mono);
   font-weight: 700;
   /* About 6.4px glyphs, growing a little on very wide windows (`--cols` cells of Geist Mono's 0.6em). */
   font-size: clamp(6.4px, 100cqw / (var(--cols) * 0.6), 8.5px);
   line-height: 0.975;
+  /* The painting's top six rows are sky for the bees: they rise into the gap above, so the tallest flowers start one
+     section gap below the last section, like every other section. */
+  margin-top: calc(-6 * 0.975em);
+}
+
+.garland pre {
+  margin: 0;
+  font: inherit;
   letter-spacing: 0;
   white-space: pre;
 }
 
 @media (max-width: 40rem) {
-  .garland pre {
+  .garland-art {
     font-size: 4.2px;
   }
 }

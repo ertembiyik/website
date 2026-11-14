@@ -6,7 +6,8 @@ import type { ImageMetadata } from "astro";
  * A pile of photos and clips. Drop files into src/assets/me/ (jpg, png, webp, mp4, webm);
  * they are sorted by filename, so prefix them to control order. A mouse hover or a tap opens
  * the pile into an orb around the top photo; picking a card in the orb brings it to the front.
- * A click on the top card, or a sideways swipe on touch, sends it to the back.
+ * A click on the top card, or a sideways swipe on touch, sends it to the back. A sideways trackpad
+ * swipe over the orb turns it.
  */
 const images = import.meta.glob<{ default: ImageMetadata }>("../assets/me/*.{jpg,jpeg,png,webp}", {
   eager: true,
@@ -493,6 +494,19 @@ const { width, height } = Astro.props;
         event.stopPropagation();
       },
       { capture: true, signal },
+    );
+    // A sideways trackpad swipe over the open orb turns it, front cards following the fingers; the
+    // system's scroll momentum carries the turn on. Cancelling it also keeps swipe-back from firing.
+    window.addEventListener(
+      "wheel",
+      (event) => {
+        if (!orb.open || orb.via !== "mouse" || Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+        event.preventDefault();
+        spin -= (event.deltaX * (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1)) / orb.radius;
+        spinRate = 0;
+        schedule();
+      },
+      { passive: false, signal },
     );
     window.addEventListener(
       "scroll",

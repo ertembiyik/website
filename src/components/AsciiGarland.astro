@@ -1,0 +1,1138 @@
+---
+import sharp from "sharp";
+import artwork from "../assets/garland.svg?raw";
+
+/**
+ * The footer garland: the illustration in src/assets/garland.svg turned into coloured characters at
+ * build time. Every 8×13 px cell (the 0.6 × 0.975 em proportions of a Geist Mono line) becomes one
+ * glyph: an outline stroke on a thin edge, otherwise a density character from coverage and light. Its
+ * colour is the cell's average, lifted in OKLCH so it glows on the dark page, snapped to a k-means
+ * palette of `tones` colours and written in Display P3. The script below redraws it on a canvas where
+ * the flowers sway in a breeze and the pointer, or a finger, pushes them aside.
+ */
+interface Props {
+  cols?: number;
+  rows?: number;
+  tones?: number;
+}
+
+const { cols = 400, rows = 44, tones = 48 } = Astro.props;
+
+type Vec3 = [number, number, number];
+
+const cellW = 8;
+const cellH = 13;
+const ramp = " .:-+*ox%#@";
+
+// sRGB ↔ OKLab ↔ Display P3, per Björn Ottosson's OKLab and the CSS Color 4 matrices.
+const toLinear = (value: number) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+const toGamma = (value: number) => (value <= 0.0031308 ? 12.92 * value : 1.055 * value ** (1 / 2.4) - 0.055);
+const oklab = ([r, g, b]: Vec3): Vec3 => {
+  const [lr, lg, lb] = [r, g, b].map((value) => toLinear(value / 255)) as Vec3;
+  const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+  const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+  const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+};
+// Linear-light Display P3; inside the gamut when every channel is within 0…1.
+const linearP3 = ([L, a, b]: Vec3): Vec3 => {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  const g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  const bl = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s;
+  return [0.8224621 * r + 0.177538 * g, 0.0331941 * r + 0.9668058 * g, 0.0170827 * r + 0.0723974 * g + 0.9105199 * bl];
+};
+// Lift dark tones and add chroma, then pull chroma back until the colour fits Display P3. Foliage
+// stays a step dimmer so the flowers carry the light.
+const glow = (colour: Vec3): Vec3 => {
+  const [L, a, b] = oklab(colour);
+  const foliage = a < -0.03 && b > 0;
+  const lifted = foliage ? 0.2 + 0.5 * Math.max(0, L) : 0.3 + 0.68 * Math.max(0, L) ** 0.8;
+  for (let chroma = 1.25; chroma > 0; chroma -= 0.05) {
+    const candidate: Vec3 = [lifted, a * chroma, b * chroma];
+    if (linearP3(candidate).every((value) => value >= 0 && value <= 1)) return candidate;
+  }
+  return [lifted, 0, 0];
+};
+
+const { data } = await sharp(Buffer.from(artwork), { density: 144 })
+  .resize(cols * cellW, rows * cellH, { fit: "fill" })
+  .ensureAlpha()
+  .raw()
+  .toBuffer({ resolveWithObject: true });
+
+const sampleCell = (col: number, row: number) => {
+  let alpha = 0;
+  const sum: Vec3 = [0, 0, 0];
+  const quadrants = [0, 0, 0, 0];
+  for (let y = 0; y < cellH; y++) {
+    for (let x = 0; x < cellW; x++) {
+      const i = ((row * cellH + y) * cols * cellW + col * cellW + x) * 4;
+      const a = (data[i + 3] ?? 0) / 255;
+      alpha += a;
+      sum[0] += (data[i] ?? 0) * a;
+      sum[1] += (data[i + 1] ?? 0) * a;
+      sum[2] += (data[i + 2] ?? 0) * a;
+      quadrants[(y < cellH / 2 ? 0 : 2) + (x < cellW / 2 ? 0 : 1)]! += a;
+    }
+  }
+  const area = cellW * cellH;
+  const coverage = alpha / area;
+  if (coverage < 0.1) return undefined;
+
+  const colour: Vec3 = [sum[0] / alpha, sum[1] / alpha, sum[2] / alpha];
+  const [tl, tr, bl, br] = quadrants.map((value) => value / (area / 4)) as [number, number, number, number];
+  const gx = (tr + br - tl - bl) / 2;
+  const gy = (bl + br - tl - tr) / 2;
+  let char: string;
+  if (coverage < 0.42 && Math.hypot(gx, gy) > 0.5) {
+    const sector = Math.round(((Math.atan2(gy, gx) + Math.PI) / Math.PI) * 4) % 8;
+    char = sector % 4 === 0 ? "|" : sector % 4 === 2 ? (gy > 0 ? "_" : "-") : sector === 1 || sector === 5 ? "/" : "\\";
+  } else {
+    const light = (0.2126 * colour[0] + 0.7152 * colour[1] + 0.0722 * colour[2]) / 255;
+    const density = Math.min(1, coverage * (0.18 + 1.05 * light));
+    char = ramp[Math.max(1, Math.min(ramp.length - 1, Math.round(density * (ramp.length - 1))))]!;
+  }
+  return { char, colour: glow(colour) };
+};
+
+const cells = Array.from({ length: rows }, (_, row) => Array.from({ length: cols }, (_, col) => sampleCell(col, row)));
+
+// A deterministic k-means palette over every drawn cell, in OKLab so steps are even to the eye.
+const drawn = cells.flat().flatMap((cell) => (cell ? [cell.colour] : []));
+const distance = (a: Vec3, b: Vec3) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+let palette: Vec3[] = Array.from({ length: tones }, (_, i) => drawn[Math.floor((i / tones) * drawn.length)] ?? [0, 0, 0]);
+const nearest = (colour: Vec3) => {
+  let best = 0;
+  palette.forEach((tone, i) => {
+    if (distance(colour, tone) < distance(colour, palette[best]!)) best = i;
+  });
+  return best;
+};
+for (let pass = 0; pass < 12; pass++) {
+  const sums = palette.map(() => [0, 0, 0, 0]);
+  for (const colour of drawn) {
+    const sum = sums[nearest(colour)]!;
+    sum[0]! += colour[0];
+    sum[1]! += colour[1];
+    sum[2]! += colour[2];
+    sum[3]! += 1;
+  }
+  palette = palette.map((tone, i) => {
+    const [L, a, b, n] = sums[i]!;
+    return n ? [L! / n, a! / n, b! / n] : tone;
+  });
+}
+
+const p3 = (tone: Vec3) =>
+  `color(display-p3 ${linearP3(tone).map((value) => toGamma(Math.min(1, Math.max(0, value))).toFixed(4)).join(" ")})`;
+const css = palette.map((tone, i) => `.garland .g${i}{color:${p3(tone)}}`).join("");
+// Per tone for the script: OKLab, to find flowers by colour, then the Display P3 colour it draws with.
+const toneData = JSON.stringify(
+  palette.map((tone) => [
+    ...tone.map((value) => Number(value.toFixed(3))),
+    ...linearP3(tone).map((value) => Number(toGamma(Math.min(1, Math.max(0, value))).toFixed(4))),
+  ]),
+);
+
+const art = cells
+  .map((line) => {
+    let out = "";
+    let open = -1;
+    for (const cell of line) {
+      const tone = cell ? nearest(cell.colour) : -1;
+      if (tone !== open && open >= 0) out += "</span>";
+      if (tone !== open && tone >= 0) out += `<span class="g${tone}">`;
+      open = tone;
+      out += cell ? cell.char : " ";
+    }
+    if (open >= 0) out += "</span>";
+    return out.trimEnd();
+  })
+  .join("\n");
+---
+
+<div class="garland" aria-hidden="true" data-garland data-tones={toneData}>
+  <div class="garland-art">
+    <pre style={{ "--cols": cols }} set:html={art} />
+  </div>
+</div>
+<style is:inline set:html={css} />
+
+<script>
+  /** OKLab (to find flowers by colour) and the Display P3 colour a tone draws with. */
+  type Tone = [number, number, number, number, number, number];
+  type Cell = { char: string; col: number; row: number; tone: number };
+  type Spot = { col: number; row: number };
+  /** Where the pointer or finger is in the painting (`col`) and across the whole width (`x`), and how fast it moves
+   * sideways (columns a second). */
+  type Hand = Spot & { x: number; speed: number };
+  type Plant = {
+    cells: Cell[];
+    /** Top row of the plant, and the lowest row of its flower head. */
+    crown: number;
+    head: number;
+    centre: number;
+    /** Occupied columns per row at rest, for where the hand meets the plant. */
+    extent: Map<number, [number, number]>;
+    omega: number;
+    /** Rows of stem from the ground up to the head. */
+    length: number;
+    /** The head's sideways offset (columns) and speed. Next to it the stem weighs nothing, so its shape follows. */
+    y: number;
+    v: number;
+    /** The loads bending the stem, from the head and from the hand at height `at`: they give its shape. */
+    load: number;
+    push: number;
+    at: number;
+    /** The height the hand meets the plant at, and where there it meets it, easing toward the hand so pointer events
+     * arriving in steps, or a landing finger, don't jump it. */
+    grabbed: number;
+    held: number;
+    touching: boolean;
+    /** Side the hand pushes from (1: from the left), 0 when untouched. */
+    side: number;
+    slipping: boolean;
+    /** Per row: what's left of the stem's quick whip home after the hand lets go, and its speed. */
+    whip: Float32Array;
+    whipSpeed: Float32Array;
+    whipping: boolean;
+  };
+  /** A bee flies across the whole width, not in the painting, so each is its own: `target` is a plant and `shift` the
+   * repeat of the painting it stands in. */
+  type Bee = { col: number; row: number; vc: number; vr: number; target: number; shift: number; until: number; phase: number; trail: Spot[]; dropped: number };
+
+  // Plants spring toward the wave field with periods in this range; it drifts slowly across the bed
+  // so neighbours move together instead of tearing apart.
+  const periods = [1.15, 1.5];
+  const bounce = 0.35;
+  // The wave field across the bed: how fast a disturbance travels (columns a second), how quickly
+  // it fades, and how firmly it settles back to the wind.
+  const waveSpeed = 55;
+  const waveDamping = 1.6;
+  const waveSettle = 6;
+  // The hand's reach past its point, in columns, and how quickly (seconds) the point where it holds a stem
+  // catches up with it, so pointer events arriving in steps move the stem smoothly.
+  const handRadius = 1.4;
+  const grip = 0.015;
+  // The hand is a soft spring, not a wall: a touched point gives firmness / (1 + firmness) of the way to it, measured
+  // against the stem's own stiffness there.
+  const firmness = 2;
+  // A swipe drags what it passes through toward its own speed with this time constant (seconds), fully above
+  // brushFast columns a second and not at all below brushSlow, where the soft hand alone does the pushing, and flicks
+  // a head no faster than brushFlick of the speed it swings through rest at from full bend.
+  const drag = 0.05;
+  const brushSlow = 80;
+  const brushFast = 250;
+  const brushFlick = 0.7;
+  // A released stem springs back home at this rate (radians a second), damped just short of critical so it settles
+  // in one smooth move instead of wobbling.
+  const whipRate = 38;
+  const whipDamping = 0.85;
+  // How far (columns) a flower head is pushed before it slips off the hand.
+  const maxBend = 5;
+  // A gust rolls across the bed for `gustRun` seconds out of every `gustCycle`.
+  const gustCycle = 8;
+  const gustRun = 3;
+  // Rows of headroom in each glyph's slot for ascenders and descenders.
+  const overhang = 0.35;
+  // The glow: blur radius and its brightness when added over the art.
+  const glowBlur = 3;
+  const glowStrength = 0.32;
+  // Instance layout: column, row, glyph, r, g, b, plant (-1 foliage, -2 placed freely), give (a plant's head row), backed, alpha.
+  const stride = 10;
+  // Untouched, frames come from a timer at this rate instead of polling every display frame.
+  const idleFps = 24;
+  // After this long with no scrolling, pointer or keys anywhere, the breeze dies down, the bees land,
+  // and drawing stops until something moves again.
+  const restAfter = 8000;
+
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+  const wrap = (value: number, size: number) => ((value % size) + size) % size;
+  // A cantilever rooted at the ground: how far height `s` moves under a unit load at height `c`.
+  const flex = (s: number, c: number) => (s <= c ? (s * s * (3 * c - s)) / 6 : (c * c * (3 * s - c)) / 6);
+
+  // Every glyph is one instance of a quad. The vertex shader moves it by its plant's offset at its row (or the wave
+  // field, for foliage) read from a small float texture, and snaps it to device pixels so atlas texels
+  // land 1:1 and the characters stay crisp.
+  const vertexSource = `#version 300 es
+    layout(location = 0) in vec2 a_cell;
+    layout(location = 1) in float a_glyph;
+    layout(location = 2) in vec3 a_color;
+    layout(location = 3) in float a_plant;
+    layout(location = 4) in float a_give;
+    layout(location = 5) in float a_backed;
+    layout(location = 6) in float a_alpha;
+    uniform sampler2D u_state;
+    uniform vec2 u_cell;
+    uniform vec2 u_slot;
+    uniform vec2 u_lead;
+    uniform float u_slotColumns;
+    uniform vec2 u_atlasSize;
+    uniform vec2 u_view;
+    uniform float u_origin;
+    out vec2 v_texel;
+    out vec2 v_inCell;
+    out vec3 v_color;
+    out float v_alpha;
+    flat out float v_backed;
+    const vec2 corners[6] = vec2[6](vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, 1.0), vec2(1.0, 0.0), vec2(1.0, 1.0));
+    void main() {
+      vec2 corner = corners[gl_VertexID];
+      float offset = 0.0;
+      float drop = 0.0;
+      if (a_plant >= 0.0) {
+        offset = texelFetch(u_state, ivec2(int(a_plant), 1 + int(a_cell.y)), 0).r;
+        // The head dips on its arc as one piece, by how far the top of the stem leans.
+        float base = texelFetch(u_state, ivec2(int(a_plant), 1 + int(max(a_cell.y, a_give))), 0).r;
+        drop = base * base * 0.015;
+      } else if (a_plant > -1.5) {
+        offset = texelFetch(u_state, ivec2(int(a_cell.x), 0), 0).r * a_give;
+      }
+      vec2 cell = vec2(u_origin + (a_cell.x + offset) * u_cell.x, (a_cell.y + drop) * u_cell.y);
+      vec2 slot = floor(cell - u_lead + 0.5);
+      gl_Position = vec4((slot + corner * u_slot) / u_view * vec2(2.0, -2.0) + vec2(-1.0, 1.0), 0.0, 1.0);
+      vec2 atlasSlot = vec2(mod(a_glyph, u_slotColumns), floor(a_glyph / u_slotColumns)) * u_slot;
+      v_texel = (atlasSlot + corner * u_slot) / u_atlasSize;
+      v_inCell = (corner * u_slot - u_lead) / u_cell;
+      v_color = a_color;
+      v_alpha = a_alpha;
+      v_backed = a_backed;
+    }`;
+
+  // Flower heads paint an opaque cell behind their glyph, so drawing back to front lets a nearer
+  // flower cover the one behind it. The glow pass adds a blurred copy of every glyph on top.
+  const fragmentSource = `#version 300 es
+    precision mediump float;
+    uniform sampler2D u_atlas;
+    uniform vec3 u_background;
+    uniform float u_glow;
+    uniform vec2 u_fade;
+    in vec2 v_texel;
+    in vec2 v_inCell;
+    in vec3 v_color;
+    in float v_alpha;
+    flat in float v_backed;
+    out vec4 colour;
+    void main() {
+      float coverage = texture(u_atlas, v_texel).a * v_alpha;
+      bool inside = all(greaterThanEqual(v_inCell, vec2(0.0))) && all(lessThanEqual(v_inCell, vec2(1.0)));
+      // Fade out toward the window edges here, so the page needs no CSS mask layer.
+      float fade = clamp(min(gl_FragCoord.x, u_fade.x - gl_FragCoord.x) / u_fade.y, 0.0, 1.0);
+      if (u_glow == 0.0 && v_backed > 0.5 && inside) {
+        colour = vec4(mix(u_background, v_color, coverage), 1.0) * fade;
+        return;
+      }
+      if (coverage < 0.004) discard;
+      float strength = u_glow > 0.0 ? u_glow : 1.0;
+      colour = vec4(v_color * coverage * strength, coverage * strength) * fade;
+    }`;
+
+  function bindGarland(signal: AbortSignal) {
+    const host = document.querySelector<HTMLElement>("[data-garland]");
+    const box = host?.querySelector<HTMLElement>(".garland-art");
+    const pre = box?.querySelector("pre");
+    if (!host || !box || !pre || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: true, antialias: false });
+    // Without WebGL 2 the static art stays.
+    if (!gl) return;
+    if ("drawingBufferColorSpace" in gl) gl.drawingBufferColorSpace = "display-p3";
+    const tones: Tone[] = JSON.parse(host.dataset.tones ?? "[]");
+
+    // Read the glyphs back out of the static art.
+    const read: Cell[] = [];
+    let row = 0;
+    let col = 0;
+    let cols = 0;
+    for (const node of Array.from(pre.childNodes)) {
+      const tone = node instanceof HTMLElement ? Number(node.className.slice(1)) : -1;
+      for (const char of node.textContent ?? "") {
+        if (char === "\n") {
+          row += 1;
+          col = 0;
+          continue;
+        }
+        if (tone >= 0 && char !== " ") read.push({ char, col, row, tone });
+        col += 1;
+        cols = Math.max(cols, col);
+      }
+    }
+    const rows = row + 1;
+    const ground = rows - 1;
+
+    // Find the flowers: connected patches of one hue, non-green. A patch whose bounds sit mostly inside
+    // a bigger one's (a flower's centre) joins it. A column's stems and leaves go with the flower that
+    // fills most of it; the rest is foliage, which sways with the wave field column by column.
+    const green = (tone: number) => {
+      const [, a = 0, b = 0] = tones[tone] ?? [];
+      return a < -0.03 && b > -0.02;
+    };
+    // Same flower: the same hue (petal outlines are darker but share it), or both near-white.
+    const near = (x: number, y: number) => {
+      const [l1 = 0, a1 = 0, b1 = 0] = tones[x] ?? [];
+      const [l2 = 0, a2 = 0, b2 = 0] = tones[y] ?? [];
+      if (Math.hypot(a1, b1) < 0.025 || Math.hypot(a2, b2) < 0.025) return Math.abs(l1 - l2) < 0.35;
+      const turn = Math.abs(Math.atan2(b1, a1) - Math.atan2(b2, a2));
+      return Math.min(turn, 2 * Math.PI - turn) < 0.6;
+    };
+    const grid = new Map<number, number>();
+    for (const cell of read) if (!green(cell.tone)) grid.set(cell.row * cols + cell.col, cell.tone);
+    const patchOf = new Map<number, number>();
+    const sizes: number[] = [];
+    const bounds: number[][] = [];
+    for (const [start, tone] of grid) {
+      if (patchOf.has(start)) continue;
+      const id = sizes.length;
+      const queue = [start];
+      const extent = [Infinity, Infinity, -Infinity, -Infinity];
+      patchOf.set(start, id);
+      let size = 0;
+      while (queue.length) {
+        const cell = queue.pop()!;
+        const r = Math.floor(cell / cols);
+        const c = cell % cols;
+        size += 1;
+        extent.splice(0, 4, Math.min(extent[0]!, r), Math.min(extent[1]!, c), Math.max(extent[2]!, r), Math.max(extent[3]!, c));
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const next = (r + dr) * cols + c + dc;
+            const other = grid.get(next);
+            if (other === undefined || patchOf.has(next) || c + dc < 0 || c + dc >= cols || !near(tone, other)) continue;
+            patchOf.set(next, id);
+            queue.push(next);
+          }
+        }
+      }
+      sizes.push(size);
+      bounds.push(extent);
+    }
+    const area = ([r0 = 0, c0 = 0, r1 = 0, c1 = 0]: number[]) => Math.max(0, r1 - r0 + 1) * Math.max(0, c1 - c0 + 1);
+    const parent = sizes.map((_, id) => id);
+    const rootOf = (id: number): number => (parent[id] === id ? id : (parent[id] = rootOf(parent[id]!)));
+    sizes.forEach((size, id) => {
+      const inner = bounds[id]!;
+      const outer = sizes.findIndex((other, j) => {
+        if (j === id || other <= size) return false;
+        const b = bounds[j]!;
+        return area([Math.max(inner[0]!, b[0]!), Math.max(inner[1]!, b[1]!), Math.min(inner[2]!, b[2]!), Math.min(inner[3]!, b[3]!)]) >= area(inner) * 0.7;
+      });
+      if (outer >= 0) parent[id] = outer;
+    });
+    const total = sizes.map(() => 0);
+    sizes.forEach((size, id) => (total[rootOf(id)]! += size));
+    const flowerAt = (cell: number) => {
+      const id = patchOf.get(cell);
+      return id === undefined || total[rootOf(id)]! < 8 ? -1 : rootOf(id);
+    };
+
+    const indexOf = new Map<number, number>();
+    const columnFlower = Array.from({ length: cols }, (_, c) => {
+      const counts = new Map<number, number>();
+      for (let r = 0; r < rows; r++) {
+        const id = flowerAt(r * cols + c);
+        if (id >= 0) counts.set(id, (counts.get(id) ?? 0) + 1);
+      }
+      return [...counts].sort((x, y) => y[1] - x[1])[0]?.[0] ?? -1;
+    });
+    const owners = read.map((cell) => {
+      const id = flowerAt(cell.row * cols + cell.col);
+      const flower = id >= 0 ? id : columnFlower[cell.col]!;
+      if (flower < 0) return -1;
+      return indexOf.get(flower) ?? indexOf.set(flower, indexOf.size).get(flower)!;
+    });
+    // A flower head is solid: a stem or leaf showing through a narrow gap between its petals takes the petal colour
+    // and moves with the head, or it stays behind as a hole when the head sways.
+    const cellIndex = new Map(read.map((cell, i) => [cell.row * cols + cell.col, i]));
+    read.forEach((cell, i) => {
+      if (flowerAt(cell.row * cols + cell.col) >= 0) return;
+      const petal = (step: number) => {
+        for (let d = 1; d <= 2; d++) {
+          const col = cell.col + step * d;
+          const flower = col >= 0 && col < cols ? flowerAt(cell.row * cols + col) : -1;
+          if (flower >= 0) return { flower, tone: read[cellIndex.get(cell.row * cols + col)!]!.tone };
+        }
+        return undefined;
+      };
+      const left = petal(-1);
+      const right = petal(1);
+      if (!left || !right || left.flower !== right.flower) return;
+      owners[i] = indexOf.get(left.flower)!;
+      cell.tone = left.tone;
+    });
+    const foliage = read.filter((_, i) => owners[i] === -1);
+    const plants: Plant[] = Array.from({ length: indexOf.size }, (_, index) => {
+      const cells = read.filter((_, i) => owners[i] === index);
+      const petals = cells.filter((cell) => flowerAt(cell.row * cols + cell.col) >= 0);
+      const crown = Math.min(...cells.map((cell) => cell.row));
+      const head = petals.length ? Math.max(...petals.map((cell) => cell.row)) : crown;
+      const centre = cells.reduce((sum, cell) => sum + cell.col, 0) / cells.length;
+      const extent = new Map<number, [number, number]>();
+      for (const cell of cells) {
+        const [l, r] = extent.get(cell.row) ?? [cell.col, cell.col];
+        extent.set(cell.row, [Math.min(l, cell.col), Math.max(r, cell.col)]);
+      }
+      return {
+        cells,
+        crown,
+        head,
+        centre,
+        extent,
+        omega: (2 * Math.PI) / (periods[0]! + (periods[1]! - periods[0]!) * (0.5 + 0.5 * Math.sin(centre * 0.04))),
+        length: Math.max(2, ground - head),
+        y: 0,
+        v: 0,
+        load: 0,
+        push: 0,
+        at: 0,
+        grabbed: 0,
+        held: 0,
+        touching: false,
+        side: 0,
+        slipping: false,
+        whip: new Float32Array(rows),
+        whipSpeed: new Float32Array(rows),
+        whipping: false,
+      };
+    });
+    const order = [...plants].sort((a, b) => b.cells.length - a.cells.length);
+    // How far a plant sits from rest at height `s` above the ground: the stem's shape under its loads, and the head
+    // riding its tip as one piece (tilting it would shear the head's rows apart).
+    const bend = (plant: Plant, s: number) => {
+      const { length, load, push, at } = plant;
+      return s < length ? load * flex(s, length) + push * flex(s, at) : plant.y;
+    };
+    const offsetAt = (plant: Plant, r: number) => bend(plant, ground - r) + plant.whip[r]!;
+    // The plant's outline at row `at`, blended between the rows either side, so the edge the hand slides along is
+    // smooth instead of stepping a row at a time.
+    const outline = (plant: Plant, at: number): [number, number] | undefined => {
+      const r = Math.floor(at);
+      const f = at - r;
+      const a = plant.extent.get(r);
+      const b = plant.extent.get(r + 1);
+      if (a && b) return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+      return f < 0.5 ? a : b;
+    };
+    const foliageTop = Math.min(ground, ...foliage.map((cell) => cell.row));
+    const foliageGive = (at: number) => 0.7 * Math.pow(clamp((ground - at) / Math.max(3, ground - foliageTop), 0, 1), 1.5);
+
+    // Glyphs as instances, back to front: foliage, then bigger flowers behind smaller ones.
+    const glyphs = [...new Set([...read.map((cell) => cell.char), "8", "/", "\\", ".", "-"])];
+    const glyphIndex = new Map(glyphs.map((char, i) => [char, i]));
+    const instance = (out: Float32Array, at: number, cell: Cell, plant: number, give: number, backed: boolean) => {
+      const [, , , r = 1, g = 1, b = 1] = tones[cell.tone] ?? [];
+      out.set([cell.col, cell.row, glyphIndex.get(cell.char) ?? 0, r, g, b, plant, give, backed ? 1 : 0, 1], at * stride);
+    };
+    const instances = new Float32Array(read.length * stride);
+    let count = 0;
+    for (const cell of foliage) instance(instances, count++, cell, -1, foliageGive(cell.row), false);
+    for (const plant of order) {
+      const index = plants.indexOf(plant);
+      for (const cell of plant.cells) instance(instances, count++, cell, index, plant.head, cell.row <= plant.head);
+    }
+    // Bees: a body, two wings and a short trail each.
+    // About one bee per this many columns in view.
+    const beeSpacing = 90;
+    const maxBees = 12;
+    const beeSlots = maxBees * 7;
+    const beeData = new Float32Array(beeSlots * stride);
+    // The per-frame state for the shader: row 0 holds the wave field, rows 1… every plant's offset per row.
+    const stateWidth = Math.max(cols, plants.length);
+    const stems = new Float32Array(plants.length * rows);
+
+    canvas.className = "garland-canvas";
+    host.append(canvas);
+
+    type Graphics = {
+      program: WebGLProgram;
+      art: WebGLVertexArrayObject;
+      bees: WebGLVertexArrayObject;
+      beeBuffer: WebGLBuffer;
+      stateTexture: WebGLTexture;
+      atlas: WebGLTexture;
+      glow: WebGLTexture;
+      uniforms: Record<string, WebGLUniformLocation | null>;
+    };
+    let graphics: Graphics | undefined;
+    let metrics = { advance: 0, line: 0, ratio: 1, size: 0, slot: [0, 0], lead: [0, 0], atlas: [0, 0], slotColumns: 8 };
+
+    const compile = (type: number, source: string) => {
+      const shader = gl.createShader(type)!;
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(shader));
+      return shader;
+    };
+    const vertexArray = (buffer: WebGLBuffer) => {
+      const vao = gl.createVertexArray()!;
+      gl.bindVertexArray(vao);
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      const layout: [number, number, number][] = [[0, 2, 0], [1, 1, 2], [2, 3, 3], [3, 1, 6], [4, 1, 7], [5, 1, 8], [6, 1, 9]];
+      for (const [location, size, offset] of layout) {
+        gl.enableVertexAttribArray(location);
+        gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride * 4, offset * 4);
+        gl.vertexAttribDivisor(location, 1);
+      }
+      gl.bindVertexArray(null);
+      return vao;
+    };
+    const texture = () => {
+      const handle = gl.createTexture()!;
+      gl.bindTexture(gl.TEXTURE_2D, handle);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      return handle;
+    };
+
+    const setup = () => {
+      const program = gl.createProgram()!;
+      gl.attachShader(program, compile(gl.VERTEX_SHADER, vertexSource));
+      gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentSource));
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        console.error(gl.getProgramInfoLog(program));
+        return;
+      }
+      const artBuffer = gl.createBuffer()!;
+      gl.bindBuffer(gl.ARRAY_BUFFER, artBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, instances, gl.STATIC_DRAW);
+      const beeBuffer = gl.createBuffer()!;
+      gl.bindBuffer(gl.ARRAY_BUFFER, beeBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, beeData.byteLength, gl.DYNAMIC_DRAW);
+      const stateTexture = texture();
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.R32F, stateWidth, rows + 1, 0, gl.RED, gl.FLOAT, new Float32Array(stateWidth * (rows + 1)));
+      const uniforms = Object.fromEntries(
+        ["u_state", "u_atlas", "u_cell", "u_slot", "u_lead", "u_slotColumns", "u_atlasSize", "u_view", "u_origin", "u_background", "u_glow", "u_fade"].map((name) => [
+          name,
+          gl.getUniformLocation(program, name),
+        ]),
+      );
+      graphics = { program, art: vertexArray(artBuffer), bees: vertexArray(beeBuffer), beeBuffer, stateTexture, atlas: texture(), glow: texture(), uniforms };
+      metrics.size = 0;
+      measure();
+    };
+
+    // Draw every distinct glyph once, white, into an atlas at device resolution, plus a blurred copy
+    // for the glow. Rebuilt only when the glyph size or pixel density changes.
+    const rasterise = (size: number, ratio: number, family: string) => {
+      if (!graphics) return;
+      const probe = document.createElement("canvas").getContext("2d")!;
+      const font = `700 ${size * ratio}px ${family}`;
+      probe.font = font;
+      const metricsText = probe.measureText("M");
+      const advance = metricsText.width;
+      const line = size * 0.975 * ratio;
+      const margin = Math.ceil(glowBlur * 3 * ratio);
+      const slot = [Math.ceil(advance) + margin * 2, Math.ceil(line * (1 + overhang * 2)) + margin * 2];
+      const lead = [margin, margin + Math.round(line * overhang)];
+      const slotColumns = 8;
+      const atlas = [slot[0]! * slotColumns, slot[1]! * Math.ceil(glyphs.length / slotColumns)];
+      const sharp = document.createElement("canvas");
+      sharp.width = atlas[0]!;
+      sharp.height = atlas[1]!;
+      const ctx = sharp.getContext("2d")!;
+      ctx.font = font;
+      ctx.fillStyle = "#fff";
+      ctx.textBaseline = "alphabetic";
+      const baseline = (line - metricsText.fontBoundingBoxAscent - metricsText.fontBoundingBoxDescent) / 2 + metricsText.fontBoundingBoxAscent;
+      glyphs.forEach((char, i) => {
+        const x = (i % slotColumns) * slot[0]! + lead[0]!;
+        const y = Math.floor(i / slotColumns) * slot[1]! + lead[1]! + baseline;
+        ctx.fillText(char, x, y);
+      });
+      const soft = document.createElement("canvas");
+      soft.width = atlas[0]!;
+      soft.height = atlas[1]!;
+      const softCtx = soft.getContext("2d")!;
+      softCtx.filter = `blur(${glowBlur * ratio}px)`;
+      softCtx.drawImage(sharp, 0, 0);
+      for (const [handle, source] of [[graphics.atlas, sharp], [graphics.glow, soft]] as const) {
+        gl.bindTexture(gl.TEXTURE_2D, handle);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+      }
+      metrics = { advance: advance / ratio, line: line / ratio, ratio, size, slot, lead, atlas, slotColumns };
+    };
+
+    const measure = () => {
+      const style = getComputedStyle(pre);
+      const size = parseFloat(style.fontSize);
+      const ratio = devicePixelRatio || 1;
+      if (size !== metrics.size || ratio !== metrics.ratio) rasterise(size, ratio, style.fontFamily);
+      const width = host.clientWidth;
+      const height = rows * metrics.line;
+      canvas.width = Math.round(width * ratio);
+      canvas.height = Math.round(height * ratio);
+      canvas.style.cssText = `left:0;top:${box.offsetTop}px;width:${width}px;height:${height}px`;
+    };
+
+    // The field the flowers lean into: a slow sway plus a gust rolling across, which the hand disturbs.
+    const field = new Float32Array(cols);
+    const fieldVelocity = new Float32Array(cols);
+    const wind = (at: number, t: number) => {
+      // Whole waves per repeat of the art, so the breeze joins up at the seam.
+      const phase = (at / cols) * 2 * Math.PI;
+      const sway = 0.4 * Math.sin(t * 0.8 + phase * 3) + 0.2 * Math.sin(t * 1.9 + phase * 7 + 1.3);
+      const run = (t % gustCycle) / gustRun;
+      if (run > 1) return sway;
+      const distance = wrap(at - run * cols + cols / 2, cols) - cols / 2;
+      return sway + 1.4 * Math.sin(Math.PI * run) * Math.exp(-((distance / 18) ** 2));
+    };
+    // How awake the meadow is: 1 while anyone is around, easing to 0 as it rests.
+    let lively = 1;
+    const breeze = new Float32Array(cols);
+    const fieldAt = (at: number) => {
+      const i = Math.floor(at);
+      const t = at - i;
+      return field[wrap(i, cols)]! * (1 - t) + field[wrap(i + 1, cols)]! * t;
+    };
+    const kick = (at: number, speed: (offset: number) => number, reach = 7) => {
+      for (let i = Math.floor(at - reach); i < at + reach; i++) {
+        const falloff = 1 - Math.abs(i - at) / reach;
+        if (falloff > 0) fieldVelocity[wrap(i, cols)]! += speed(i - at) * falloff * falloff;
+      }
+    };
+
+    let hand: Hand | undefined;
+    let view = { origin: 0, first: 0, last: cols };
+
+    // Bees: each hovers around a flower head for a few seconds, then flies to another; they dart away
+    // from the hand. Wings flap between \8/ and /8\. There are more on wider screens, each starts and lands on a
+    // flower of its own, and they leave their flowers at different times.
+    const visibleFlowers = () =>
+      plants.flatMap((plant, target) => {
+        const spots = [];
+        for (let k = Math.floor(view.first / cols); k <= Math.floor(view.last / cols); k++) {
+          const at = plant.centre + k * cols;
+          if (at > view.first + 6 && at < view.last - 6) spots.push({ target, shift: k * cols });
+        }
+        return spots;
+      });
+    const bees: Bee[] = [];
+    // A flower in view that no other bee is visiting, at random.
+    const pick = (bee?: Bee) => {
+      const taken = (spot: { target: number; shift: number }) => bees.some((other) => other !== bee && other.target === spot.target && other.shift === spot.shift);
+      const choices = visibleFlowers();
+      const free = choices.filter((spot) => !taken(spot) && !(bee && spot.target === bee.target && spot.shift === bee.shift));
+      const pool = free.length ? free : choices;
+      return pool[Math.floor(Math.random() * pool.length)];
+    };
+    const flock = () => {
+      const count = clamp(Math.round((view.last - view.first) / beeSpacing), 1, maxBees);
+      bees.length = Math.min(bees.length, count);
+      while (bees.length < count) {
+        const spot = pick();
+        if (!spot) break;
+        const plant = plants[spot.target]!;
+        bees.push({
+          col: plant.centre + spot.shift + (Math.random() - 0.5) * 12,
+          row: plant.crown - 1 - Math.random() * 3,
+          vc: 0,
+          vr: 0,
+          ...spot,
+          until: performance.now() / 1000 + Math.random() * 4,
+          phase: Math.random() * 10,
+          trail: [],
+          dropped: 0,
+        });
+      }
+    };
+    const fly = (t: number, h: number) => {
+      for (const bee of bees) {
+        const inView = bee.target < plants.length && plants[bee.target]!.centre + bee.shift > view.first && plants[bee.target]!.centre + bee.shift < view.last;
+        // A resting bee stays on its flower until something stirs.
+        if ((t > bee.until && lively > 0.5) || !inView) {
+          Object.assign(bee, pick(bee) ?? {});
+          bee.until = t + 2.5 + Math.random() * 3.5;
+        }
+        const plant = plants[bee.target]!;
+        // Hovering circles the flower head; as the meadow rests, the bee settles onto it.
+        const aimCol = plant.centre + bee.shift + plant.y + Math.cos(t * 1.3 + bee.phase) * 3.2 * lively;
+        const aimRow = plant.crown - 0.6 - (0.6 - Math.sin(t * 1.9 + bee.phase) * 1.4) * lively;
+        let ac = (aimCol - bee.col) * 5 - bee.vc * 2.4 + Math.sin(t * 7.3 + bee.phase * 3) * 7 * lively;
+        let ar = (aimRow - bee.row) * 5 - bee.vr * 2.4 + Math.cos(t * 6.1 + bee.phase) * 4 * lively;
+        if (hand) {
+          const dc = bee.col - hand.x;
+          const dr = (bee.row - hand.row) * 1.6;
+          const distance = Math.hypot(dc, dr) || 1;
+          if (distance < 10) {
+            ac += (dc / distance) * (10 - distance) * 30;
+            ar += (dr / distance) * (10 - distance) * 14;
+          }
+        }
+        bee.vc = clamp(bee.vc + ac * h, -30, 30);
+        bee.vr = clamp(bee.vr + ar * h, -15, 15);
+        bee.col += bee.vc * h;
+        bee.row = clamp(bee.row + bee.vr * h, 0.5, ground - 2);
+        if (t - bee.dropped > 0.09) {
+          if (lively > 0.3) bee.trail.unshift({ col: bee.col, row: bee.row });
+          bee.trail.length = Math.min(bee.trail.length, lively > 0.3 ? 4 : Math.max(0, bee.trail.length - 1));
+          bee.dropped = t;
+        }
+      }
+    };
+
+    // Write the bees as freely placed glyph instances: gold body, pale wings, a fading gold trail.
+    const placeBees = (t: number) => {
+      beeData.fill(0);
+      let slot = 0;
+      const put = (char: string, at: Spot, [r, g, b]: [number, number, number], alpha: number) => {
+        beeData.set([at.col, at.row, glyphIndex.get(char) ?? 0, r, g, b, -2, 0, 0, alpha], slot++ * stride);
+      };
+      for (const bee of bees) {
+        bee.trail.forEach((spot, i) => put(".", spot, [1, 0.85, 0.4], 0.45 - i * 0.1));
+        // Wings flap while flying and fold flat once the bee has landed.
+        const up = Math.floor(t * 16 + bee.phase) % 2 === 0;
+        const left = lively < 0.15 ? "-" : up ? "\\" : "/";
+        const right = lively < 0.15 ? "-" : up ? "/" : "\\";
+        put(left, { col: bee.col - 1, row: bee.row }, [0.92, 0.95, 1], 0.85);
+        put(right, { col: bee.col + 1, row: bee.row }, [0.92, 0.95, 1], 0.85);
+        put("8", bee, [1, 0.8, 0.25], 1);
+      }
+      return slot;
+    };
+
+    const draw = (t: number) => {
+      if (!graphics) return;
+      const { program, art, bees: beeArray, beeBuffer, stateTexture, atlas, glow, uniforms } = graphics;
+      const { advance, ratio, slot, lead, atlas: atlasSize, slotColumns } = metrics;
+      const origin = box.getBoundingClientRect().left - host.getBoundingClientRect().left;
+      view = { origin, first: -origin / advance, last: (canvas.width / ratio - origin) / advance };
+
+      // The only per-frame upload: the wave field and each plant's offset per row, a few thousand floats.
+      plants.forEach((plant, i) => {
+        for (let r = plant.crown; r <= ground; r++) stems[r * plants.length + i] = offsetAt(plant, r);
+      });
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, stateTexture);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, cols, 1, gl.RED, gl.FLOAT, field);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 1, plants.length, rows, gl.RED, gl.FLOAT, stems);
+      const beeCount = placeBees(t);
+      gl.bindBuffer(gl.ARRAY_BUFFER, beeBuffer);
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, beeData);
+
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.clearColor(0, 0, 0, 0);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(program);
+      gl.uniform1i(uniforms.u_state!, 1);
+      gl.uniform1i(uniforms.u_atlas!, 0);
+      gl.uniform2f(uniforms.u_cell!, advance * ratio, metrics.line * ratio);
+      gl.uniform2f(uniforms.u_slot!, slot[0]!, slot[1]!);
+      gl.uniform2f(uniforms.u_lead!, lead[0]!, lead[1]!);
+      gl.uniform1f(uniforms.u_slotColumns!, slotColumns);
+      gl.uniform2f(uniforms.u_atlasSize!, atlasSize[0]!, atlasSize[1]!);
+      gl.uniform2f(uniforms.u_view!, canvas.width, canvas.height);
+      gl.uniform3f(uniforms.u_background!, 10 / 255, 10 / 255, 10 / 255);
+      gl.uniform2f(uniforms.u_fade!, canvas.width, canvas.width * 0.1);
+      gl.enable(gl.BLEND);
+
+      // The art repeats across the canvas: one instanced draw per copy in view, then the same again
+      // with the blurred atlas, added on top for the glow.
+      const copies: number[] = [];
+      for (let k = Math.floor(view.first / cols); k <= Math.floor(view.last / cols); k++) copies.push(k * cols);
+      for (const [texture, strength] of [[atlas, 0], [glow, glowStrength]] as const) {
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1f(uniforms.u_glow!, strength);
+        if (strength) gl.blendFunc(gl.ONE, gl.ONE);
+        else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        gl.bindVertexArray(art);
+        for (const shift of copies) {
+          gl.uniform1f(uniforms.u_origin!, (origin + shift * advance) * ratio);
+          gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, count);
+        }
+        // Bees fly across the whole width, so they're drawn once rather than with every repeat of the painting.
+        gl.uniform1f(uniforms.u_origin!, origin * ratio);
+        gl.bindVertexArray(beeArray);
+        gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, beeCount);
+      }
+      gl.bindVertexArray(null);
+    };
+
+    // Whether the hand is at a plant this step, and at what height: where the plant would have to be there for
+    // its edge to sit at the hand. It can push, never pull.
+    const press = (plant: Plant) => {
+      // Rows are centred half a row below their top edge.
+      const at = hand ? hand.row - 0.5 : ground;
+      const reach = outline(plant, at);
+      if (!hand || !reach || at > ground - 1) {
+        plant.side = 0;
+        plant.slipping = false;
+        return undefined;
+      }
+      // Height above the ground. Lower down, the stem is stiffer and a small push swings the head far: past what
+      // would take the head beyond maxBend, the hand slips off.
+      const s = ground - at;
+      const offset = bend(plant, s) + plant.whip[Math.round(at)]!;
+      const left = reach[0] + offset;
+      const right = reach[1] + 1 + offset;
+      if (hand.col < left - handRadius - 1 || hand.col > right + handRadius + 1) {
+        plant.side = 0;
+        plant.slipping = false;
+        return undefined;
+      }
+      if (plant.slipping || hand.col < left - handRadius || hand.col > right + handRadius) return undefined;
+      plant.side ||= hand.col < (left + right) / 2 ? 1 : -1;
+      const goal = plant.side > 0 ? hand.col + handRadius - reach[0] : hand.col - handRadius - reach[1] - 1;
+      const { length } = plant;
+      if (Math.abs(goal) > maxBend * (s < length ? flex(s, s) / flex(length, s) : 1)) {
+        plant.slipping = true;
+        return undefined;
+      }
+      return { s, goal };
+    };
+
+    const step = (t: number, h: number) => {
+      for (let i = 0; i < cols; i++) {
+        const laplacian = field[wrap(i - 1, cols)]! + field[wrap(i + 1, cols)]! - 2 * field[i]!;
+        fieldVelocity[i]! +=
+          (waveSpeed * waveSpeed * laplacian - waveDamping * fieldVelocity[i]! - waveSettle * (field[i]! - breeze[i]!)) * h;
+      }
+      for (let i = 0; i < cols; i++) field[i]! += fieldVelocity[i]! * h;
+
+      for (const plant of plants) {
+        const { length } = plant;
+        const w = plant.omega;
+        // The stem holds its head with a cantilever's stiffness, and the wind pushes on the head.
+        const tip = flex(length, length);
+        const mass = 1 / (tip * w * w);
+        let stiffness = 1 / tip;
+        let pull = fieldAt(plant.centre) / tip;
+        const touch = press(plant);
+        const was = plant.touching;
+        // The head keeps its own weight under the soft hand, so a push bends it gradually.
+        let s = 0;
+        let firm = 0;
+        let reach = 0;
+        let soft = 0;
+        plant.touching = false;
+        if (touch) {
+          s = Math.min(touch.s, length);
+          // A new touch, or a jump to another height, starts from where the plant is there, so nothing jumps.
+          if (!was || Math.abs(s - plant.grabbed) > 1) plant.held = bend(plant, s);
+          plant.grabbed = s;
+          plant.held += (touch.goal - plant.held) * (1 - Math.exp(-h / grip));
+          const low = flex(s, s);
+          const cross = flex(length, s);
+          reach = cross / tip;
+          firm = firmness / low;
+          soft = (firm * (tip * low - cross * cross)) / tip;
+          if (plant.side * (plant.held - plant.y * reach) > 0) {
+            plant.touching = true;
+            stiffness += (firm * reach * reach) / (1 + soft);
+            pull += (firm * reach * plant.held) / (1 + soft);
+          }
+        }
+        // Implicit in the stiffness, so a firm hand stays steady. A head swings no faster than through rest from full
+        // bend, however fast the hand flicks it.
+        const speed = (plant.v + (h * (pull - stiffness * plant.y)) / mass) / (1 + 2 * (1 - bounce) * w * h + (h * h * stiffness) / mass);
+        plant.v = clamp(speed, -maxBend * w, maxBend * w);
+        plant.y = clamp(plant.y + plant.v * h, -maxBend * 1.5, maxBend * 1.5);
+        // The touched point settles between the plant and the hand; the hand lets go once it no longer presses.
+        let push = 0;
+        if (plant.touching) {
+          push = firm * (plant.held - (plant.y * reach + soft * plant.held) / (1 + soft));
+          if (plant.side * push <= 0) plant.touching = false;
+        }
+        // On the head, the hand pushes the head itself and the stem keeps its free shape.
+        if (!plant.touching || s >= length) push = 0;
+        const load = (plant.y - push * flex(length, s)) / tip;
+        const at = push ? s : 0;
+        // Let go, the stem springs back from where it was instead of jumping there.
+        const released = was && !plant.touching;
+        if (released) for (let r = plant.crown; r <= ground; r++) plant.whip[r]! += bend(plant, ground - r);
+        plant.load = load;
+        plant.push = push;
+        plant.at = at;
+        if (released) {
+          for (let r = plant.crown; r <= ground; r++) plant.whip[r]! -= bend(plant, ground - r);
+          plant.whipping = true;
+        }
+        if (plant.whipping) {
+          let moving = false;
+          for (let r = plant.crown; r <= ground; r++) {
+            plant.whipSpeed[r]! -= (whipRate * whipRate * plant.whip[r]! + 2 * whipDamping * whipRate * plant.whipSpeed[r]!) * h;
+            plant.whip[r]! += plant.whipSpeed[r]! * h;
+            moving ||= Math.abs(plant.whip[r]!) > 0.005 || Math.abs(plant.whipSpeed[r]!) > 0.05;
+          }
+          if (!moving) {
+            plant.whip.fill(0);
+            plant.whipSpeed.fill(0);
+            plant.whipping = false;
+          }
+        }
+        // The push travels on through the field to the neighbours.
+        if (plant.touching && hand) kick(plant.centre, () => hand!.speed * 0.01, 5);
+      }
+      fly(t, h);
+    };
+
+    let visible = false;
+    let frame = 0;
+    let timer = 0;
+    let lastTime = 0;
+    let lastActivity = performance.now();
+
+    const still = () =>
+      lively < 0.02 &&
+      plants.every((plant) => Math.abs(plant.y) < 0.01 && Math.abs(plant.v) < 0.01 && !plant.whipping) &&
+      field.every((value, i) => Math.abs(value) < 0.01 && Math.abs(fieldVelocity[i]!) < 0.01) &&
+      bees.every((bee) => Math.abs(bee.vc) < 0.05 && Math.abs(bee.vr) < 0.05);
+
+    const tick = (now: number) => {
+      frame = 0;
+      if (!visible) return;
+      const dt = Math.min((now - lastTime) / 1000, 1 / 20);
+      lastTime = now;
+      const t = now / 1000;
+      // A hand that stops moving stops pushing things along.
+      if (hand) hand.speed *= Math.exp(-dt * 10);
+      const resting = !hand && now - lastActivity > restAfter;
+      lively += ((resting ? 0 : 1) - lively) * (1 - Math.exp(-dt * 1.5));
+      // The wind for this frame, once per column rather than once per physics step.
+      for (let i = 0; i < cols; i++) breeze[i] = wind(i, t) * lively;
+      const substeps = Math.ceil(dt * 120);
+      for (let s = 0; s < substeps; s++) step(t, dt / substeps);
+      draw(t);
+      if (resting && still()) return;
+      if (hand) frame = requestAnimationFrame(tick);
+      else
+        // Aim a little early: the frame waits for the next display refresh after the timer fires.
+        timer = window.setTimeout(() => {
+          timer = 0;
+          frame = requestAnimationFrame(tick);
+        }, Math.max(0, now + 1000 / idleFps - performance.now() - 8));
+    };
+    // Bring the next frame forward. Waiting on the idle timer, the clock keeps running from the last frame so no
+    // time is lost; only a stopped loop restarts it.
+    const wake = () => {
+      if (frame || !visible) return;
+      if (timer) window.clearTimeout(timer);
+      else lastTime = performance.now();
+      timer = 0;
+      frame = requestAnimationFrame(tick);
+    };
+    // Input anywhere else on the page only keeps the meadow awake; it doesn't change its pace.
+    const stir = () => {
+      lastActivity = performance.now();
+      if (!timer) wake();
+    };
+
+    // A quick swipe can cross a stem between two pointer events, and in so short a touch the soft hand barely moves
+    // what it does catch: every plant the path runs through picks up some of the hand's speed, less low on the stem.
+    const brush = (from: number, to: number, row: number, speed: number) => {
+      const pace = clamp((Math.abs(speed) - brushSlow) / (brushFast - brushSlow), 0, 1);
+      const at = row - 0.5;
+      if (!pace || at > ground - 1) return;
+      const start = wrap(from, cols);
+      const end = start + to - from;
+      for (const plant of plants) {
+        const reach = outline(plant, at);
+        if (!reach) continue;
+        const offset = bend(plant, ground - at);
+        let overlap = 0;
+        for (const shift of [-cols, 0, cols]) {
+          const left = reach[0] + offset - handRadius + shift;
+          const right = reach[1] + 1 + offset + handRadius + shift;
+          overlap += Math.max(0, Math.min(Math.max(start, end), right) - Math.max(Math.min(start, end), left));
+        }
+        if (!overlap) continue;
+        const s = Math.min(ground - at, plant.length);
+        const share = flex(plant.length, s) / flex(plant.length, plant.length);
+        const change = (speed * share - plant.v) * (1 - Math.exp(-overlap / Math.abs(speed) / drag)) * pace;
+        const most = brushFlick * maxBend * plant.omega;
+        const next = clamp(plant.v + change, -most, most);
+        if (Math.sign(change) === Math.sign(speed) && Math.abs(next) > Math.abs(plant.v)) plant.v = next;
+      }
+    };
+
+    let last = { col: 0, time: 0 };
+    const place = (event: PointerEvent) => {
+      const rect = box.getBoundingClientRect();
+      const col = (event.clientX - rect.left) / metrics.advance;
+      // The art repeats, so the hand acts on the matching column of the one painting.
+      const elapsed = Math.max(8, event.timeStamp - last.time);
+      const speed = last.time ? clamp(((col - last.col) / elapsed) * 1000, -120, 120) : 0;
+      hand = { col: wrap(col, cols), x: col, row: (event.clientY - rect.top) / metrics.line, speed: hand ? 0.6 * speed + 0.4 * hand.speed : speed };
+      // Moving through the bed stirs the field along the way.
+      if (last.time && hand.row > 0) {
+        kick(hand.col, () => clamp(speed, -50, 50) * 0.12);
+        brush(last.col, col, hand.row, ((col - last.col) / elapsed) * 1000);
+      }
+      last = { col, time: event.timeStamp };
+      wake();
+    };
+    host.addEventListener("pointermove", (event) => {
+      if (event.pointerType === "mouse" || hand) place(event);
+    });
+    host.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse") return;
+      last = { col: 0, time: 0 };
+      place(event);
+      // A tap sends a ripple out from the finger.
+      if (hand) kick(hand.col, (offset) => Math.sign(offset) * 10, 10);
+    });
+    const release = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse" || event.type === "pointerleave") {
+        hand = undefined;
+        last = { col: 0, time: 0 };
+      }
+    };
+    host.addEventListener("pointerup", release);
+    host.addEventListener("pointercancel", release);
+    host.addEventListener("pointerleave", release);
+
+    canvas.addEventListener("webglcontextlost", (event) => {
+      event.preventDefault();
+      graphics = undefined;
+    });
+    canvas.addEventListener("webglcontextrestored", () => setup());
+
+    for (const type of ["pointermove", "pointerdown", "scroll", "wheel", "keydown", "touchstart"] as const) {
+      window.addEventListener(type, stir, { passive: true, signal });
+    }
+
+    const resize = new ResizeObserver(() => {
+      measure();
+      draw(performance.now() / 1000);
+      flock();
+    });
+    resize.observe(box);
+    resize.observe(host);
+    const watch = new IntersectionObserver(([entry]) => {
+      visible = !!entry?.isIntersecting;
+      wake();
+    });
+    watch.observe(host);
+    signal.addEventListener("abort", () => {
+      resize.disconnect();
+      watch.disconnect();
+      cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
+    });
+
+    setup();
+    if (!graphics) return;
+    draw(performance.now() / 1000);
+    flock();
+    host.dataset.live = "";
+  }
+
+  let binding: AbortController | undefined;
+  document.addEventListener("astro:page-load", async () => {
+    binding?.abort();
+    binding = new AbortController();
+    const { signal } = binding;
+    await document.fonts.ready;
+    if (!signal.aborted) bindGarland(signal);
+  });
+</script>

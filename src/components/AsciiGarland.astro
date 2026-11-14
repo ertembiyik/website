@@ -16,7 +16,7 @@ interface Props {
   tones?: number;
 }
 
-const { cols = 240, rows = 44, tones = 48 } = Astro.props;
+const { cols = 400, rows = 44, tones = 48 } = Astro.props;
 
 type Vec3 = [number, number, number];
 
@@ -204,9 +204,9 @@ const art = cells
   const gustRun = 3;
   // Rows of headroom in each tile for ascenders and descenders.
   const overhang = 0.35;
-  const pad = 8;
 
   const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+  const wrap = (value: number, size: number) => ((value % size) + size) % size;
 
   function bindGarland(signal: AbortSignal) {
     const host = document.querySelector<HTMLElement>("[data-garland]");
@@ -364,7 +364,7 @@ const art = cells
     const context = canvas.getContext("2d", { colorSpace: "display-p3" });
     const glowContext = bloom.getContext("2d", { colorSpace: "display-p3" });
     if (!context || !glowContext) return;
-    box.append(canvas, bloom);
+    host.append(canvas, bloom);
 
     let metrics = { advance: 0, line: 0, baseline: 0, ratio: 1, font: "" };
     let foliageTiles: Tile[] = [];
@@ -403,15 +403,16 @@ const art = cells
       const line = size * 0.975;
       const baseline = (line - probe.fontBoundingBoxAscent - probe.fontBoundingBoxDescent) / 2 + probe.fontBoundingBoxAscent;
       metrics = { advance: probe.width, line, baseline, ratio, font };
-      const width = (cols + pad * 2) * probe.width;
+      // The canvas spans the whole garland; the art repeats across it, so any window is filled.
+      const width = host.clientWidth;
       const height = rows * line;
-      const placement = `left:${-pad * probe.width}px;top:0;width:${width}px;height:${height}px`;
+      const placement = `left:0;top:${box.offsetTop}px;width:${width}px;height:${height}px`;
       canvas.width = Math.round(width * ratio);
       canvas.height = Math.round(height * ratio);
       canvas.style.cssText = placement;
-      // The glow only needs a quarter of the resolution; CSS blurs it.
-      bloom.width = Math.round(width / 4);
-      bloom.height = Math.round(height / 4);
+      // The glow only needs a fifth of the resolution; CSS blurs it.
+      bloom.width = Math.round(width / 5);
+      bloom.height = Math.round(height / 5);
       bloom.style.cssText = placement;
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.font = font;
@@ -439,21 +440,23 @@ const art = cells
     const field = new Float32Array(cols);
     const fieldVelocity = new Float32Array(cols);
     const wind = (at: number, t: number) => {
-      const sway = 0.4 * Math.sin(t * 0.8 + at * 0.045) + 0.2 * Math.sin(t * 1.9 + at * 0.11 + 1.3);
+      // Whole waves per repeat of the art, so the breeze joins up at the seam.
+      const phase = (at / cols) * 2 * Math.PI;
+      const sway = 0.4 * Math.sin(t * 0.8 + phase * 3) + 0.2 * Math.sin(t * 1.9 + phase * 7 + 1.3);
       const run = (t % gustCycle) / gustRun;
       if (run > 1) return sway;
-      const front = -30 + run * (cols + 60);
-      return sway + 1.4 * Math.sin(Math.PI * run) * Math.exp(-(((at - front) / 18) ** 2));
+      const distance = wrap(at - run * cols + cols / 2, cols) - cols / 2;
+      return sway + 1.4 * Math.sin(Math.PI * run) * Math.exp(-((distance / 18) ** 2));
     };
     const fieldAt = (at: number) => {
-      const i = clamp(Math.floor(at), 0, cols - 2);
-      const t = clamp(at - i, 0, 1);
-      return field[i]! * (1 - t) + field[i + 1]! * t;
+      const i = Math.floor(at);
+      const t = at - i;
+      return field[wrap(i, cols)]! * (1 - t) + field[wrap(i + 1, cols)]! * t;
     };
     const kick = (at: number, speed: (offset: number) => number, reach = 7) => {
-      for (let i = Math.max(0, Math.floor(at - reach)); i < Math.min(cols, at + reach); i++) {
+      for (let i = Math.floor(at - reach); i < at + reach; i++) {
         const falloff = 1 - Math.abs(i - at) / reach;
-        fieldVelocity[i]! += speed(i - at) * falloff * falloff;
+        if (falloff > 0) fieldVelocity[wrap(i, cols)]! += speed(i - at) * falloff * falloff;
       }
     };
 
@@ -462,7 +465,11 @@ const art = cells
 
     // Bees: each hovers around a flower head for a few seconds, then flies to another; they dart away
     // from the hand. Wings flap between \8/ and /8\.
-    const visibleFlowers = () => plants.flatMap((plant, i) => (plant.centre > view.first + 6 && plant.centre < view.last - 6 ? [i] : []));
+    const visibleFlowers = () =>
+      plants.flatMap((plant, i) => {
+        const at = plant.centre + Math.floor((view.first + view.last) / 2 / cols) * cols;
+        return at > view.first + 6 && at < view.last - 6 ? [i] : [];
+      });
     const bees: Bee[] = [];
     const flock = () => {
       const count = view.last - view.first > 160 ? 3 : 2;
@@ -497,7 +504,7 @@ const art = cells
         }
         bee.vc = clamp(bee.vc + ac * h, -30, 30);
         bee.vr = clamp(bee.vr + ar * h, -15, 15);
-        bee.col += bee.vc * h;
+        bee.col = wrap(bee.col + bee.vc * h, cols);
         bee.row = clamp(bee.row + bee.vr * h, 0.5, ground - 2);
         if (t - bee.dropped > 0.09) {
           bee.trail.unshift({ col: bee.col, row: bee.row });
@@ -511,13 +518,19 @@ const art = cells
     const draw = (t: number) => {
       const { advance, line, baseline, ratio } = metrics;
       const snap = (value: number) => Math.round(value * ratio) / ratio;
-      const hostRect = host.getBoundingClientRect();
-      const boxRect = box.getBoundingClientRect();
-      view = { first: (hostRect.left - boxRect.left) / advance, last: (hostRect.right - boxRect.left) / advance };
+      const width = canvas.width / ratio;
+      // Where column 0 of the art sits on the canvas, and which repeats of the art are in view.
+      const origin = box.getBoundingClientRect().left - host.getBoundingClientRect().left;
+      view = { first: -origin / advance, last: (width - origin) / advance };
+      const copies: number[] = [];
+      for (let k = Math.floor(view.first / cols); k <= Math.floor(view.last / cols); k++) copies.push(k * cols);
       const blit = (piece: Tile, offset: number, drop: number) => {
-        const x = (piece.col + pad + offset) * advance;
-        if (x > (view.last + pad) * advance || x + piece.canvas.width / ratio < (view.first + pad) * advance) return;
-        context.drawImage(piece.canvas, snap(x), snap((piece.row - overhang + drop) * line), piece.canvas.width / ratio, piece.canvas.height / ratio);
+        const w = piece.canvas.width / ratio;
+        for (const shift of copies) {
+          const x = origin + (piece.col + shift + offset) * advance;
+          if (x > width || x + w < 0) continue;
+          context.drawImage(piece.canvas, snap(x), snap((piece.row - overhang + drop) * line), w, piece.canvas.height / ratio);
+        }
       };
 
       context.clearRect(0, 0, canvas.width, canvas.height);
@@ -527,22 +540,24 @@ const art = cells
         const drop = plant.bend * plant.bend * 0.015;
         for (const piece of plant.tiles) blit(piece, plant.bend * piece.give, drop * piece.give);
       }
-      for (const bee of bees) {
-        bee.trail.forEach((spot, i) => {
-          context.fillStyle = `color(display-p3 1 0.85 0.4 / ${0.45 - i * 0.1})`;
-          context.fillText(".", snap((spot.col + pad) * advance), snap(spot.row * line + baseline));
-        });
-        const up = Math.floor(t * 16 + bee.phase) % 2 === 0;
-        const x = (bee.col + pad) * advance;
-        const y = snap(bee.row * line + baseline);
-        context.fillStyle = "color(display-p3 0.92 0.95 1 / 0.85)";
-        context.fillText(up ? "\\" : "/", snap(x - advance), y);
-        context.fillText(up ? "/" : "\\", snap(x + advance), y);
-        context.fillStyle = "color(display-p3 1 0.8 0.25)";
-        context.fillText("8", snap(x), y);
+      for (const shift of copies) {
+        for (const bee of bees) {
+          bee.trail.forEach((spot, i) => {
+            context.fillStyle = `color(display-p3 1 0.85 0.4 / ${0.45 - i * 0.1})`;
+            context.fillText(".", snap(origin + (spot.col + shift) * advance), snap(spot.row * line + baseline));
+          });
+          const up = Math.floor(t * 16 + bee.phase) % 2 === 0;
+          const x = origin + (bee.col + shift) * advance;
+          const y = snap(bee.row * line + baseline);
+          context.fillStyle = "color(display-p3 0.92 0.95 1 / 0.85)";
+          context.fillText(up ? "\\" : "/", snap(x - advance), y);
+          context.fillText(up ? "/" : "\\", snap(x + advance), y);
+          context.fillStyle = "color(display-p3 1 0.8 0.25)";
+          context.fillText("8", snap(x), y);
+        }
       }
-      // The glow is blurred anyway: refresh it every fourth frame, every second while touched.
-      if (frames++ % (hand ? 2 : 4) === 0) {
+      // The glow is blurred anyway: refresh it every sixth frame, every third while touched.
+      if (frames++ % (hand ? 3 : 6) === 0) {
         glowContext.clearRect(0, 0, bloom.width, bloom.height);
         glowContext.drawImage(canvas, 0, 0, bloom.width, bloom.height);
       }
@@ -577,7 +592,7 @@ const art = cells
 
     const step = (t: number, h: number) => {
       for (let i = 0; i < cols; i++) {
-        const laplacian = (field[i - 1] ?? field[i]!) + (field[i + 1] ?? field[i]!) - 2 * field[i]!;
+        const laplacian = field[wrap(i - 1, cols)]! + field[wrap(i + 1, cols)]! - 2 * field[i]!;
         fieldVelocity[i]! +=
           (waveSpeed * waveSpeed * laplacian - waveDamping * fieldVelocity[i]! - waveSettle * (field[i]! - wind(i, t))) * h;
       }
@@ -625,12 +640,14 @@ const art = cells
     let last = { col: 0, time: 0 };
     const place = (event: PointerEvent) => {
       const rect = box.getBoundingClientRect();
-      hand = { col: (event.clientX - rect.left) / metrics.advance, row: (event.clientY - rect.top) / metrics.line };
+      const col = (event.clientX - rect.left) / metrics.advance;
+      // The art repeats, so the hand acts on the matching column of the one painting.
+      hand = { col: wrap(col, cols), row: (event.clientY - rect.top) / metrics.line };
       // Moving through the bed stirs the field along the way.
       const elapsed = Math.max(8, event.timeStamp - last.time);
-      const speed = ((hand.col - last.col) / elapsed) * 1000;
+      const speed = ((col - last.col) / elapsed) * 1000;
       if (last.time && hand.row > 0) kick(hand.col, () => clamp(speed, -50, 50) * 0.12);
-      last = { col: hand.col, time: event.timeStamp };
+      last = { col, time: event.timeStamp };
       wake();
     };
     host.addEventListener("pointermove", (event) => {
@@ -659,6 +676,7 @@ const art = cells
       flock();
     });
     resize.observe(box);
+    resize.observe(host);
     const watch = new IntersectionObserver(([entry]) => {
       visible = !!entry?.isIntersecting;
       wake();

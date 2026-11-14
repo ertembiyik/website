@@ -47,6 +47,8 @@ html {
 
 body {
   min-height: 100dvh;
+  /* The full-bleed garland is 100vw wide, which includes a classic scrollbar's gutter. */
+  overflow-x: clip;
   font-family: var(--font-sans);
   font-size: 0.9375rem;
   font-weight: 400;
@@ -510,15 +512,17 @@ h3 {
 
 /* ---- ASCII garland ------------------------------------------------------ */
 
-/* Wider than the column, like a shelf; narrow screens show the centre at a readable size. */
+/* Full bleed, fading out at the window edges. The art is painted to tile, and the script repeats it
+   across any width; without the script the centre shows. */
 .garland {
-  --garland-width: min(100vw - 2rem, 58rem);
+  position: relative;
   display: flex;
   justify-content: center;
-  width: var(--garland-width);
-  margin-inline: calc((100% - var(--garland-width)) / 2);
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
   margin-bottom: -2.25rem;
   overflow: hidden;
+  mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
   container-type: inline-size;
   user-select: none;
   touch-action: pan-y;
@@ -534,11 +538,17 @@ h3 {
   margin: 0;
   font-family: var(--font-mono);
   font-weight: 700;
-  /* `--cols` cells of 0.6em (Geist Mono's advance) fill the garland; never below a legible size. */
-  font-size: max(calc(100cqw / (var(--cols) * 0.6)), 4.2px);
+  /* About 6.4px glyphs, growing a little on very wide windows (`--cols` cells of Geist Mono's 0.6em). */
+  font-size: clamp(6.4px, 100cqw / (var(--cols) * 0.6), 8.5px);
   line-height: 0.975;
   letter-spacing: 0;
   white-space: pre;
+}
+
+@media (max-width: 40rem) {
+  .garland pre {
+    font-size: 4.2px;
+  }
 }
 
 .garland canvas {

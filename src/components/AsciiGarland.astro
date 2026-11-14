@@ -162,13 +162,16 @@ const art = cells
 
 <script>
   type Lab = [number, number, number];
-  type Glyph = { char: string; col: number; row: number; plant: number; give: number; shown: boolean };
+  type Cell = { char: string; col: number; row: number; tone: number; colour: string };
   type Hand = { col: number; row: number };
+  /** A pre-rendered band of glyphs, drawn each frame at an offset instead of glyph by glyph. */
+  type Tile = { canvas: HTMLCanvasElement; col: number; row: number; give: number };
   type Plant = {
-    foliage: boolean;
-    /** Top row of the plant, and the lowest row of its flower head (equal to `crown` for foliage). */
+    cells: Cell[];
+    /** Top row of the plant, and the lowest row of its flower head. */
     crown: number;
     head: number;
+    left: number;
     centre: number;
     /** Occupied columns per row at rest, for where the hand meets the plant. */
     extent: Map<number, [number, number]>;
@@ -178,10 +181,13 @@ const art = cells
     /** Side the hand pushes from (1: from the left), 0 when untouched. */
     side: number;
     slipping: boolean;
+    tiles: Tile[];
   };
+  type Bee = { col: number; row: number; vc: number; vr: number; target: number; until: number; phase: number; trail: Hand[]; dropped: number };
 
-  // Plants spring toward the wave field with periods in this range, so neighbours fall out of phase.
-  const periods = [1.1, 1.6];
+  // Plants spring toward the wave field with periods in this range; it drifts slowly across the bed
+  // so neighbours move together instead of tearing apart.
+  const periods = [1.15, 1.5];
   const bounce = 0.35;
   // The wave field across the bed: how fast a disturbance travels (columns a second), how quickly
   // it fades, and how firmly it settles back to the wind.
@@ -196,6 +202,8 @@ const art = cells
   // A gust rolls across the bed for `gustRun` seconds out of every `gustCycle`.
   const gustCycle = 8;
   const gustRun = 3;
+  // Rows of headroom in each tile for ascenders and descenders.
+  const overhang = 0.35;
   const pad = 8;
 
   const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -206,9 +214,10 @@ const art = cells
     const pre = box?.querySelector("pre");
     if (!host || !box || !pre || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const tones: Lab[] = JSON.parse(host.dataset.tones ?? "[]");
+    const background = getComputedStyle(document.body).backgroundColor;
 
     // Read the glyphs back out of the static art.
-    const read: { char: string; col: number; row: number; tone: number; colour: string }[] = [];
+    const read: Cell[] = [];
     const colourOf = new Map<string, string>();
     let row = 0;
     let col = 0;
@@ -235,9 +244,9 @@ const art = cells
     const rows = row + 1;
     const ground = rows - 1;
 
-    // Find the flowers: connected patches of similar, non-green glyphs. A patch whose bounds sit mostly
-    // inside a bigger one's (a flower's centre) joins it. Every column goes to the flower filling most
-    // of it, so a flower and its stem move as one; columns with no flower form short foliage plants.
+    // Find the flowers: connected patches of one hue, non-green. A patch whose bounds sit mostly inside
+    // a bigger one's (a flower's centre) joins it. A column's stems and leaves go with the flower that
+    // fills most of it; the rest is foliage, which sways with the wave field column by column.
     const green = (tone: number) => {
       const [, a = 0, b = 0] = tones[tone] ?? [];
       return a < -0.03 && b > -0.02;
@@ -251,7 +260,7 @@ const art = cells
       return Math.min(turn, 2 * Math.PI - turn) < 0.6;
     };
     const grid = new Map<number, number>();
-    for (const glyph of read) if (!green(glyph.tone)) grid.set(glyph.row * cols + glyph.col, glyph.tone);
+    for (const cell of read) if (!green(cell.tone)) grid.set(cell.row * cols + cell.col, cell.tone);
     const patchOf = new Map<number, number>();
     const sizes: number[] = [];
     const bounds: number[][] = [];
@@ -259,7 +268,7 @@ const art = cells
       if (patchOf.has(start)) continue;
       const id = sizes.length;
       const queue = [start];
-      const box = [Infinity, Infinity, -Infinity, -Infinity];
+      const extent = [Infinity, Infinity, -Infinity, -Infinity];
       patchOf.set(start, id);
       let size = 0;
       while (queue.length) {
@@ -267,7 +276,7 @@ const art = cells
         const r = Math.floor(cell / cols);
         const c = cell % cols;
         size += 1;
-        box.splice(0, 4, Math.min(box[0]!, r), Math.min(box[1]!, c), Math.max(box[2]!, r), Math.max(box[3]!, c));
+        extent.splice(0, 4, Math.min(extent[0]!, r), Math.min(extent[1]!, c), Math.max(extent[2]!, r), Math.max(extent[3]!, c));
         for (let dr = -1; dr <= 1; dr++) {
           for (let dc = -1; dc <= 1; dc++) {
             const next = (r + dr) * cols + c + dc;
@@ -279,20 +288,19 @@ const art = cells
         }
       }
       sizes.push(size);
-      bounds.push(box);
+      bounds.push(extent);
     }
     const area = ([r0 = 0, c0 = 0, r1 = 0, c1 = 0]: number[]) => Math.max(0, r1 - r0 + 1) * Math.max(0, c1 - c0 + 1);
     const parent = sizes.map((_, id) => id);
     const rootOf = (id: number): number => (parent[id] === id ? id : (parent[id] = rootOf(parent[id]!)));
     sizes.forEach((size, id) => {
       const inner = bounds[id]!;
-      const host = sizes.findIndex((other, j) => {
+      const outer = sizes.findIndex((other, j) => {
         if (j === id || other <= size) return false;
-        const outer = bounds[j]!;
-        const overlap = [Math.max(inner[0]!, outer[0]!), Math.max(inner[1]!, outer[1]!), Math.min(inner[2]!, outer[2]!), Math.min(inner[3]!, outer[3]!)];
-        return area(overlap) >= area(inner) * 0.7;
+        const b = bounds[j]!;
+        return area([Math.max(inner[0]!, b[0]!), Math.max(inner[1]!, b[1]!), Math.min(inner[2]!, b[2]!), Math.min(inner[3]!, b[3]!)]) >= area(inner) * 0.7;
       });
-      if (host >= 0) parent[id] = host;
+      if (outer >= 0) parent[id] = outer;
     });
     const total = sizes.map(() => 0);
     sizes.forEach((size, id) => (total[rootOf(id)]! += size));
@@ -301,66 +309,54 @@ const art = cells
       return id === undefined || total[rootOf(id)]! < 8 ? -1 : rootOf(id);
     };
 
-    const indexOf = new Map<string, number>();
-    const plantFor = (key: string) => indexOf.get(key) ?? indexOf.set(key, indexOf.size).get(key)!;
-    let foliage = 0;
-    const plantOf = Int16Array.from({ length: cols }, (_, c) => {
+    const indexOf = new Map<number, number>();
+    const columnFlower = Array.from({ length: cols }, (_, c) => {
       const counts = new Map<number, number>();
       for (let r = 0; r < rows; r++) {
         const id = flowerAt(r * cols + c);
         if (id >= 0) counts.set(id, (counts.get(id) ?? 0) + 1);
       }
-      const id = [...counts].sort((x, y) => y[1] - x[1])[0]?.[0];
-      if (id !== undefined) return plantFor(`flower-${id}`);
-      if (c === 0 || flowerAt(c - 1) >= 0 || c - foliage >= 10) foliage = c;
-      return plantFor(`leaf-${foliage}`);
+      return [...counts].sort((x, y) => y[1] - x[1])[0]?.[0] ?? -1;
     });
-    const owner = read.map((glyph) => {
-      const id = flowerAt(glyph.row * cols + glyph.col);
-      return id >= 0 ? plantFor(`flower-${id}`) : plantOf[glyph.col]!;
+    const owners = read.map((cell) => {
+      const id = flowerAt(cell.row * cols + cell.col);
+      const flower = id >= 0 ? id : columnFlower[cell.col]!;
+      if (flower < 0) return -1;
+      return indexOf.get(flower) ?? indexOf.set(flower, indexOf.size).get(flower)!;
     });
-    const keys = [...indexOf.keys()];
+    const foliage = read.filter((_, i) => owners[i] === -1);
     const plants: Plant[] = Array.from({ length: indexOf.size }, (_, index) => {
-      const mine = read.filter((_, i) => owner[i] === index);
-      const petals = mine.filter((glyph) => flowerAt(glyph.row * cols + glyph.col) >= 0);
-      const crown = Math.min(ground, ...mine.map((glyph) => glyph.row));
+      const cells = read.filter((_, i) => owners[i] === index);
+      const petals = cells.filter((cell) => flowerAt(cell.row * cols + cell.col) >= 0);
+      const crown = Math.min(...cells.map((cell) => cell.row));
+      const centre = cells.reduce((sum, cell) => sum + cell.col, 0) / cells.length;
+      const extent = new Map<number, [number, number]>();
+      for (const cell of cells) {
+        const [l, r] = extent.get(cell.row) ?? [cell.col, cell.col];
+        extent.set(cell.row, [Math.min(l, cell.col), Math.max(r, cell.col)]);
+      }
       return {
-        foliage: keys[index]!.startsWith("leaf"),
+        cells,
         crown,
-        head: petals.length ? Math.max(...petals.map((glyph) => glyph.row)) : crown,
-        centre: mine.reduce((sum, glyph) => sum + glyph.col, 0) / Math.max(1, mine.length),
-        extent: new Map(),
-        omega: (2 * Math.PI) / (periods[0]! + (periods[1]! - periods[0]!) * (0.5 + 0.5 * Math.sin(index * 2.3))),
+        head: petals.length ? Math.max(...petals.map((cell) => cell.row)) : crown,
+        left: Math.min(...cells.map((cell) => cell.col)),
+        centre,
+        extent,
+        omega: (2 * Math.PI) / (periods[0]! + (periods[1]! - periods[0]!) * (0.5 + 0.5 * Math.sin(centre * 0.04))),
         bend: 0,
         velocity: 0,
         side: 0,
         slipping: false,
+        tiles: [],
       };
     });
-    // How much of the head's movement a row takes: the flower head moves as one piece with a slight
-    // tilt, and the stem below it bends down to the root.
-    const giveAt = (plant: Plant, at: number) => {
-      if (at <= plant.head) return 1 + 0.12 * ((plant.crown + plant.head) / 2 - at) / Math.max(1, plant.head - plant.crown);
-      return Math.pow(clamp((ground - at) / Math.max(3, ground - plant.head), 0, 1), 1.4);
-    };
-
-    const groups = new Map<string, Glyph[]>();
-    read.forEach(({ colour, char, col, row }, i) => {
-      const glyph = { char, col, row };
-      const index = owner[i]!;
-      const plant = plants[index]!;
-      const [left, right] = plant.extent.get(glyph.row) ?? [glyph.col, glyph.col];
-      plant.extent.set(glyph.row, [Math.min(left, glyph.col), Math.max(right, glyph.col)]);
-      const list = groups.get(colour) ?? [];
-      list.push({ ...glyph, plant: index, give: giveAt(plant, glyph.row), shown: true });
-      groups.set(colour, list);
-    });
-    // Front to back: smaller flowers, then bigger ones, then foliage. Each frame a cell shows only the
-    // frontmost glyph that lands in it, so flowers moving past each other occlude instead of smearing.
-    const size = plants.map((_, index) => owner.filter((value) => value === index).length);
-    const depth = (plant: number) => (plants[plant]!.foliage ? 1e6 : 0) + size[plant]!;
-    const ordered = [...groups.values()].flat().sort((a, b) => depth(a.plant) - depth(b.plant));
-    const taken = new Uint8Array(rows * (cols + pad * 2));
+    // Back to front: bigger flowers behind smaller ones.
+    const order = [...plants].sort((a, b) => b.cells.length - a.cells.length);
+    // How much of the head's movement a row takes: the head moves as one piece, the stem bends to the root.
+    const giveAt = (plant: Plant, at: number) =>
+      at <= plant.head ? 1 : Math.pow(clamp((ground - at) / Math.max(3, ground - plant.head), 0, 1), 1.4);
+    const foliageTop = Math.min(ground, ...foliage.map((cell) => cell.row));
+    const foliageGive = (at: number) => 0.7 * Math.pow(clamp((ground - at) / Math.max(3, ground - foliageTop), 0, 1), 1.5);
 
     const canvas = document.createElement("canvas");
     const bloom = document.createElement("canvas");
@@ -368,10 +364,35 @@ const art = cells
     const context = canvas.getContext("2d", { colorSpace: "display-p3" });
     const glowContext = bloom.getContext("2d", { colorSpace: "display-p3" });
     if (!context || !glowContext) return;
-    box.append(bloom, canvas);
+    box.append(canvas, bloom);
 
-    let metrics = { advance: 0, line: 0, baseline: 0 };
-    let frames = 0;
+    let metrics = { advance: 0, line: 0, baseline: 0, ratio: 1, font: "" };
+    let foliageTiles: Tile[] = [];
+
+    // Render a band of cells once into its own canvas. Flower heads get an opaque backing behind each
+    // glyph, so drawing back to front lets a nearer flower cover the one behind it.
+    const tile = (cells: Cell[], col0: number, row0: number, width: number, height: number, give: number, backing: boolean): Tile => {
+      const { advance, line, baseline, ratio, font } = metrics;
+      const out = document.createElement("canvas");
+      out.width = Math.ceil(width * advance * ratio);
+      out.height = Math.ceil((height + overhang * 2) * line * ratio);
+      const ctx = out.getContext("2d", { colorSpace: "display-p3" })!;
+      ctx.scale(ratio, ratio);
+      ctx.font = font;
+      ctx.textBaseline = "alphabetic";
+      for (const cell of cells) {
+        const x = (cell.col - col0) * advance;
+        const y = (cell.row - row0 + overhang) * line;
+        if (backing) {
+          ctx.fillStyle = background;
+          ctx.fillRect(x, y, advance, line);
+        }
+        ctx.fillStyle = cell.colour;
+        ctx.fillText(cell.char, x, y + baseline);
+      }
+      return { canvas: out, col: col0, row: row0, give };
+    };
+
     const measure = () => {
       const style = getComputedStyle(pre);
       const size = parseFloat(style.fontSize);
@@ -381,7 +402,7 @@ const art = cells
       const probe = context.measureText("M");
       const line = size * 0.975;
       const baseline = (line - probe.fontBoundingBoxAscent - probe.fontBoundingBoxDescent) / 2 + probe.fontBoundingBoxAscent;
-      metrics = { advance: probe.width, line, baseline };
+      metrics = { advance: probe.width, line, baseline, ratio, font };
       const width = (cols + pad * 2) * probe.width;
       const height = rows * line;
       const placement = `left:${-pad * probe.width}px;top:0;width:${width}px;height:${height}px`;
@@ -395,35 +416,22 @@ const art = cells
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.font = font;
       context.textBaseline = "alphabetic";
-    };
 
-    const draw = () => {
-      const { advance, line, baseline } = metrics;
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      // Skip columns the crop hides on narrow screens.
-      const hostRect = host.getBoundingClientRect();
-      const boxRect = box.getBoundingClientRect();
-      const first = Math.floor((hostRect.left - boxRect.left) / advance) - pad;
-      const last = Math.ceil((hostRect.right - boxRect.left) / advance) + pad;
-      taken.fill(0);
-      for (const glyph of ordered) {
-        const cell = glyph.row * (cols + pad * 2) + Math.round(glyph.col + pad + plants[glyph.plant]!.bend * glyph.give);
-        glyph.shown = !taken[cell];
-        taken[cell] = 1;
-      }
-      for (const [colour, list] of groups) {
-        context.fillStyle = colour;
-        for (const { char, col, row, plant, give, shown } of list) {
-          if (!shown || col < first || col > last) continue;
-          const { bend } = plants[plant]!;
-          // A pushed head swings on an arc, dipping a little as it leans.
-          context.fillText(char, (col + pad + bend * give) * advance, (row + bend * bend * 0.015 * give) * line + baseline);
+      for (const plant of plants) {
+        const right = Math.max(...plant.cells.map((cell) => cell.col)) + 1;
+        const head = plant.cells.filter((cell) => cell.row <= plant.head);
+        plant.tiles = [tile(head, plant.left, plant.crown, right - plant.left, plant.head - plant.crown + 1, 1, true)];
+        for (let r = plant.head + 1; r <= ground; r += 2) {
+          const band = plant.cells.filter((cell) => cell.row >= r && cell.row < r + 2);
+          if (band.length) plant.tiles.push(tile(band, plant.left, r, right - plant.left, 2, giveAt(plant, r + 0.5), false));
         }
       }
-      // The glow is blurred anyway; refreshing it every third frame is plenty.
-      if (frames++ % 3 === 0) {
-        glowContext.clearRect(0, 0, bloom.width, bloom.height);
-        glowContext.drawImage(canvas, 0, 0, bloom.width, bloom.height);
+      foliageTiles = [];
+      for (let c = 0; c < cols; c += 4) {
+        for (let r = foliageTop; r <= ground; r += 3) {
+          const band = foliage.filter((cell) => cell.col >= c && cell.col < c + 4 && cell.row >= r && cell.row < r + 3);
+          if (band.length) foliageTiles.push(tile(band, c, r, 4, 3, foliageGive(r + 1.5), false));
+        }
       }
     };
 
@@ -450,6 +458,95 @@ const art = cells
     };
 
     let hand: Hand | undefined;
+    let view = { first: 0, last: cols };
+
+    // Bees: each hovers around a flower head for a few seconds, then flies to another; they dart away
+    // from the hand. Wings flap between \8/ and /8\.
+    const visibleFlowers = () => plants.flatMap((plant, i) => (plant.centre > view.first + 6 && plant.centre < view.last - 6 ? [i] : []));
+    const bees: Bee[] = [];
+    const flock = () => {
+      const count = view.last - view.first > 160 ? 3 : 2;
+      const choices = visibleFlowers();
+      while (bees.length < count && choices.length) {
+        const target = choices[Math.floor(Math.random() * choices.length)]!;
+        const plant = plants[target]!;
+        bees.push({ col: plant.centre, row: plant.crown - 3, vc: 0, vr: 0, target, until: 0, phase: Math.random() * 10, trail: [], dropped: 0 });
+      }
+      bees.length = Math.min(bees.length, count);
+    };
+    const fly = (t: number, h: number) => {
+      for (const bee of bees) {
+        if (t > bee.until || !plants[bee.target]) {
+          const choices = visibleFlowers().filter((i) => i !== bee.target);
+          bee.target = choices[Math.floor(Math.random() * choices.length)] ?? bee.target;
+          bee.until = t + 2.5 + Math.random() * 3.5;
+        }
+        const plant = plants[bee.target]!;
+        const aimCol = plant.centre + plant.bend + Math.cos(t * 1.3 + bee.phase) * 3.2;
+        const aimRow = plant.crown - 1.2 + Math.sin(t * 1.9 + bee.phase) * 1.4;
+        let ac = (aimCol - bee.col) * 5 - bee.vc * 2.4 + Math.sin(t * 7.3 + bee.phase * 3) * 7;
+        let ar = (aimRow - bee.row) * 5 - bee.vr * 2.4 + Math.cos(t * 6.1 + bee.phase) * 4;
+        if (hand) {
+          const dc = bee.col - hand.col;
+          const dr = (bee.row - hand.row) * 1.6;
+          const distance = Math.hypot(dc, dr) || 1;
+          if (distance < 10) {
+            ac += (dc / distance) * (10 - distance) * 30;
+            ar += (dr / distance) * (10 - distance) * 14;
+          }
+        }
+        bee.vc = clamp(bee.vc + ac * h, -30, 30);
+        bee.vr = clamp(bee.vr + ar * h, -15, 15);
+        bee.col += bee.vc * h;
+        bee.row = clamp(bee.row + bee.vr * h, 0.5, ground - 2);
+        if (t - bee.dropped > 0.09) {
+          bee.trail.unshift({ col: bee.col, row: bee.row });
+          bee.trail.length = Math.min(bee.trail.length, 4);
+          bee.dropped = t;
+        }
+      }
+    };
+
+    let frames = 0;
+    const draw = (t: number) => {
+      const { advance, line, baseline, ratio } = metrics;
+      const snap = (value: number) => Math.round(value * ratio) / ratio;
+      const hostRect = host.getBoundingClientRect();
+      const boxRect = box.getBoundingClientRect();
+      view = { first: (hostRect.left - boxRect.left) / advance, last: (hostRect.right - boxRect.left) / advance };
+      const blit = (piece: Tile, offset: number, drop: number) => {
+        const x = (piece.col + pad + offset) * advance;
+        if (x > (view.last + pad) * advance || x + piece.canvas.width / ratio < (view.first + pad) * advance) return;
+        context.drawImage(piece.canvas, snap(x), snap((piece.row - overhang + drop) * line), piece.canvas.width / ratio, piece.canvas.height / ratio);
+      };
+
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      for (const piece of foliageTiles) blit(piece, fieldAt(piece.col + 2) * piece.give, 0);
+      for (const plant of order) {
+        // A pushed head swings on an arc, dipping a little as it leans.
+        const drop = plant.bend * plant.bend * 0.015;
+        for (const piece of plant.tiles) blit(piece, plant.bend * piece.give, drop * piece.give);
+      }
+      for (const bee of bees) {
+        bee.trail.forEach((spot, i) => {
+          context.fillStyle = `color(display-p3 1 0.85 0.4 / ${0.45 - i * 0.1})`;
+          context.fillText(".", snap((spot.col + pad) * advance), snap(spot.row * line + baseline));
+        });
+        const up = Math.floor(t * 16 + bee.phase) % 2 === 0;
+        const x = (bee.col + pad) * advance;
+        const y = snap(bee.row * line + baseline);
+        context.fillStyle = "color(display-p3 0.92 0.95 1 / 0.85)";
+        context.fillText(up ? "\\" : "/", snap(x - advance), y);
+        context.fillText(up ? "/" : "\\", snap(x + advance), y);
+        context.fillStyle = "color(display-p3 1 0.8 0.25)";
+        context.fillText("8", snap(x), y);
+      }
+      // The glow is blurred anyway: refresh it every fourth frame, every second while touched.
+      if (frames++ % (hand ? 2 : 4) === 0) {
+        glowContext.clearRect(0, 0, bloom.width, bloom.height);
+        glowContext.drawImage(canvas, 0, 0, bloom.width, bloom.height);
+      }
+    };
 
     // The hand presses on a plant's edge at the height it touches; it can push but never pull.
     const press = (plant: Plant) => {
@@ -495,6 +592,7 @@ const art = cells
         // A pushed flower nudges the field, so the push travels on to its neighbours.
         if (pushed) kick(plant.centre, () => pushed * h * 0.04, 5);
       }
+      fly(t, h);
     };
 
     let visible = false;
@@ -515,7 +613,7 @@ const art = cells
       lastDraw = now;
       const substeps = Math.ceil(dt * 120);
       for (let s = 0; s < substeps; s++) step(now / 1000, dt / substeps);
-      draw();
+      draw(now / 1000);
       frame = requestAnimationFrame(tick);
     };
     const wake = () => {
@@ -557,7 +655,8 @@ const art = cells
 
     const resize = new ResizeObserver(() => {
       measure();
-      draw();
+      draw(performance.now() / 1000);
+      flock();
     });
     resize.observe(box);
     const watch = new IntersectionObserver(([entry]) => {
@@ -572,7 +671,8 @@ const art = cells
     });
 
     measure();
-    draw();
+    draw(performance.now() / 1000);
+    flock();
     host.dataset.live = "";
   }
 

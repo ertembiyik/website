@@ -266,6 +266,8 @@ h3 {
   margin-block: 0.25rem 0.75rem;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  touch-action: pan-y; /* sideways swipes flip the cards, vertical ones still scroll */
 }
 
 .pile[role="button"] {

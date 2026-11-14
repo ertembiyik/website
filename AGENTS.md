@@ -47,7 +47,7 @@ Personal site built with Astro, deployed as static assets on Cloudflare Workers.
 ### Key Components
 - **AppIcon.astro** - Renders an image inside an Apple-style squircle (`corner-shape: squircle` with an SVG mask fallback) and optionally assigns a `view-transition-name`
 - **IconTile.astro** - Monochrome glyph in a squircle tile with a hover tooltip, used for the Connect row
-- **PhotoStack.astro** - The hero pile of photos/videos; a mouse hover opens it into an orb around the top photo that follows the pointer (spring-driven, hover-capable fine pointers only, off under reduced motion), a click on an orb card brings it to the front, a click on the top card sends it to the back
+- **PhotoStack.astro** - The hero pile of photos/videos. A mouse hover (fine pointers) or a tap opens it into an orb around the top photo: the ring follows the pointer, or spins when dragged on touch, and a picked card swaps places with the top photo. A click on the top card, or a sideways swipe on touch, sends it to the back. One spring drives every move; reduced motion keeps the orb off
 - **Layout.astro** - Metadata, font preloads, and the once-per-session intro flag
 
 ### Styling and motion

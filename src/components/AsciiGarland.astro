@@ -207,6 +207,24 @@ const art = cells
   /** A bee flies across the whole width, not in the painting, so each is its own: `target` is a plant and `shift` the
    * repeat of the painting it stands in. */
   type Bee = { col: number; row: number; vc: number; vr: number; target: number; shift: number; until: number; phase: number; trail: Spot[]; dropped: number };
+  /** A butterfly drifts between flowers on bobbing wingbeats, lands on a head and rests there opening and closing its
+   * wings; `flap` is its wingbeat phase and `wing` its colour. Like a bee it flies across the whole width. */
+  type Butterfly = {
+    col: number;
+    row: number;
+    vc: number;
+    vr: number;
+    target: number;
+    shift: number;
+    until: number;
+    phase: number;
+    flap: number;
+    /** It flaps in bursts until `burst`, then glides with its wings held open until `glide`. */
+    burst: number;
+    glide: number;
+    landed: boolean;
+    wing: number;
+  };
 
   // Plants spring toward the wave field with periods in this range; it drifts slowly across the bed
   // so neighbours move together instead of tearing apart.
@@ -249,6 +267,15 @@ const art = cells
   const stride = 10;
   // Untouched, frames come from a timer at this rate instead of polling every display frame.
   const idleFps = 24;
+  // Butterflies: wing colours (Display P3) and the wings from open to folded, either side of a body two rows tall:
+  // forewings beside it on the top row, hindwings beside its tail below.
+  // Sky blue, white, lemon and lilac.
+  const wingColours = [[0.46, 0.77, 1], [0.95, 0.97, 1], [1, 0.89, 0.43], [0.79, 0.63, 1]] as const;
+  const wingFrames = [
+    [["\\", "/"], ["/", "\\"]],
+    [["|", "|"], ["|", "|"]],
+    [["'", "'"], [".", "."]],
+  ] as const;
   // After this long with no scrolling, pointer or keys anywhere, the breeze dies down, the bees land,
   // and drawing stops until something moves again.
   const restAfter = 8000;
@@ -523,7 +550,7 @@ const art = cells
     const foliageGive = (at: number) => 0.7 * Math.pow(clamp((ground - at) / Math.max(3, ground - foliageTop), 0, 1), 1.5);
 
     // Glyphs as instances, back to front: foliage, then bigger flowers behind smaller ones.
-    const glyphs = [...new Set([...read.map((cell) => cell.char), "8", "/", "\\", ".", "-"])];
+    const glyphs = [...new Set([...read.map((cell) => cell.char), "8", "/", "\\", ".", "-", "|", "'", "i"])];
     const glyphIndex = new Map(glyphs.map((char, i) => [char, i]));
     const instance = (out: Float32Array, at: number, cell: Cell, plant: number, give: number, backed: boolean) => {
       const [, , , r = 1, g = 1, b = 1] = tones[cell.tone] ?? [];
@@ -540,7 +567,10 @@ const art = cells
     // About one bee per this many columns in view.
     const beeSpacing = 90;
     const maxBees = 12;
-    const beeSlots = maxBees * 7;
+    // About one butterfly per this many columns in view.
+    const butterflySpacing = 160;
+    const maxButterflies = 6;
+    const beeSlots = maxBees * 7 + maxButterflies * 6;
     const beeData = new Float32Array(beeSlots * stride);
     // The per-frame state for the shader: row 0 holds the wave field, rows 1… every plant's offset per row.
     const stateWidth = Math.max(cols, plants.length);
@@ -716,16 +746,49 @@ const art = cells
         return spots;
       });
     const bees: Bee[] = [];
-    // A flower in view that no other bee is visiting, at random.
-    const pick = (bee?: Bee) => {
-      const taken = (spot: { target: number; shift: number }) => bees.some((other) => other !== bee && other.target === spot.target && other.shift === spot.shift);
-      const choices = visibleFlowers();
-      const free = choices.filter((spot) => !taken(spot) && !(bee && spot.target === bee.target && spot.shift === bee.shift));
-      const pool = free.length ? free : choices;
+    const butterflies: Butterfly[] = [];
+    // A flower in view that nothing else is visiting, at random; with `away`, preferably one at least that many
+    // columns from where the flier is, so it crosses the meadow, and with `tall`, only flowers whose heads top the
+    // meadow, so a butterfly rests where it shows.
+    const pick = (flier?: Bee | Butterfly, away = 0, tall = false) => {
+      const taken = (spot: { target: number; shift: number }) =>
+        [...bees, ...butterflies].some((other) => other !== flier && other.target === spot.target && other.shift === spot.shift);
+      const choices = visibleFlowers().filter((spot) => !tall || plants[spot.target]!.crown <= 14);
+      const free = choices.filter((spot) => !taken(spot) && !(flier && spot.target === flier.target && spot.shift === flier.shift));
+      const far = flier ? free.filter((spot) => Math.abs(plants[spot.target]!.centre + spot.shift - flier.col) >= away) : free;
+      const pool = far.length ? far : free.length ? free : choices;
       return pool[Math.floor(Math.random() * pool.length)];
     };
+    // A random wing colour, one no other butterfly in view is wearing while there are any left.
+    const wingFor = () => {
+      const unused = wingColours.map((_, i) => i).filter((i) => !butterflies.some((other) => other.wing === i));
+      const pool = unused.length ? unused : wingColours.map((_, i) => i);
+      return pool[Math.floor(Math.random() * pool.length)]!;
+    };
     const flock = () => {
-      const count = clamp(Math.round((view.last - view.first) / beeSpacing), 1, maxBees);
+      const width = view.last - view.first;
+      const wanted = clamp(Math.round(width / butterflySpacing), 1, maxButterflies);
+      butterflies.length = Math.min(butterflies.length, wanted);
+      while (butterflies.length < wanted) {
+        const spot = pick(undefined, 0, true);
+        if (!spot) break;
+        const plant = plants[spot.target]!;
+        butterflies.push({
+          col: plant.centre + spot.shift + (Math.random() - 0.5) * 20,
+          row: plant.crown - 3 - Math.random() * 3,
+          vc: 0,
+          vr: 0,
+          ...spot,
+          until: performance.now() / 1000 + 2 + Math.random() * 5,
+          phase: Math.random() * 10,
+          flap: Math.random() * 6,
+          burst: 0,
+          glide: 0,
+          landed: false,
+          wing: wingFor(),
+        });
+      }
+      const count = clamp(Math.round(width / beeSpacing), 1, maxBees);
       bees.length = Math.min(bees.length, count);
       while (bees.length < count) {
         const spot = pick();
@@ -779,8 +842,71 @@ const art = cells
       }
     };
 
-    // Write the bees as freely placed glyph instances: gold body, pale wings, a fading gold trail.
-    const placeBees = (t: number) => {
+    // Butterflies flutter on about four wingbeats a second toward a spot above their flower, weaving as they go, and
+    // when it's time (or the meadow is resting) they settle on the head and ride it as it sways, opening and closing
+    // their wings slowly. A hand that comes close sends them up and away to another flower.
+    const flutter = (t: number, h: number) => {
+      for (const butterfly of butterflies) {
+        const inView = butterfly.target < plants.length && plants[butterfly.target]!.centre + butterfly.shift > view.first && plants[butterfly.target]!.centre + butterfly.shift < view.last;
+        let flee = 0;
+        let dc = 0;
+        let dr = 0;
+        if (hand) {
+          dc = butterfly.col - hand.x;
+          dr = (butterfly.row - hand.row) * 1.6;
+          flee = Math.max(0, 12 - Math.hypot(dc, dr));
+        }
+        if (!inView || (butterfly.landed && (flee > 0 || (t > butterfly.until && lively > 0.5)))) {
+          butterfly.landed = false;
+          Object.assign(butterfly, pick(butterfly, 30, true) ?? {});
+          butterfly.until = t + 4 + Math.random() * 5;
+        }
+        const plant = plants[butterfly.target]!;
+        const headCol = plant.centre + butterfly.shift + plant.y;
+        const headRow = plant.crown - 1.5;
+        if (butterfly.landed) {
+          const follow = 1 - Math.exp(-h * 12);
+          butterfly.col += (headCol - butterfly.col) * follow;
+          butterfly.row += (headRow - butterfly.row) * follow;
+          butterfly.vc = butterfly.vr = 0;
+          butterfly.flap += h * 2 * Math.PI * 0.45 * lively;
+          continue;
+        }
+        // A few quick wingbeats, then a glide on open wings, sinking a little; a scared butterfly just flaps.
+        const gliding = t < butterfly.glide && flee === 0;
+        if (!gliding) {
+          butterfly.flap += h * 2 * Math.PI * 5;
+          if (t > butterfly.burst && Math.cos(butterfly.flap) > 0.97 && flee === 0) {
+            butterfly.flap = 0;
+            butterfly.glide = t + 0.25 + Math.random() * 0.45;
+            butterfly.burst = butterfly.glide + 0.5 + Math.random() * 0.9;
+          }
+        }
+        const landing = (t > butterfly.until || lively < 0.4) && flee === 0;
+        const weave = landing ? 0 : Math.sin(t * 0.6 + butterfly.phase) * 7 + Math.sin(t * 1.7 + butterfly.phase * 2) * 3;
+        const aimCol = headCol + weave;
+        const aimRow = landing ? headRow : headRow - 3 - (1 + Math.sin(t * 0.8 + butterfly.phase)) * 2.5;
+        let ac = (aimCol - butterfly.col) * 2 - butterfly.vc * 1.8 + Math.sin(t * 3.1 + butterfly.phase) * 4;
+        let ar = (aimRow - butterfly.row) * 2.5 - butterfly.vr * 2.2 + (gliding ? 7 : 0);
+        if (flee) {
+          const distance = Math.hypot(dc, dr) || 1;
+          ac += (dc / distance) * flee * 18;
+          ar += (dr / distance) * flee * 8 - flee * 10;
+        }
+        butterfly.vc = clamp(butterfly.vc + ac * h, -14, 14);
+        butterfly.vr = clamp(butterfly.vr + ar * h, -10, 10);
+        butterfly.col += butterfly.vc * h;
+        butterfly.row = clamp(butterfly.row + butterfly.vr * h, 1, ground - 2);
+        if (landing && Math.abs(headCol - butterfly.col) < 1 && Math.abs(headRow - butterfly.row) < 0.6) {
+          butterfly.landed = true;
+          butterfly.until = t + 3 + Math.random() * 6;
+        }
+      }
+    };
+
+    // Write the bees and butterflies as freely placed glyph instances: a bee is a gold body, pale wings and a fading
+    // gold trail; a butterfly is coloured wings around a pale body, bobbing a little with each wingbeat.
+    const placeFliers = (t: number) => {
       beeData.fill(0);
       let slot = 0;
       const put = (char: string, at: Spot, [r, g, b]: [number, number, number], alpha: number) => {
@@ -795,6 +921,18 @@ const art = cells
         put(left, { col: bee.col - 1, row: bee.row }, [0.92, 0.95, 1], 0.85);
         put(right, { col: bee.col + 1, row: bee.row }, [0.92, 0.95, 1], 0.85);
         put("8", bee, [1, 0.8, 0.25], 1);
+      }
+      for (const butterfly of butterflies) {
+        const open = (1 + Math.cos(butterfly.flap)) / 2;
+        const wings = wingFrames[lively < 0.15 || open > 0.66 ? 0 : open > 0.33 ? 1 : 2];
+        const row = butterfly.row + (butterfly.landed || t < butterfly.glide ? 0 : Math.sin(butterfly.flap) * 0.3);
+        const colour = [...wingColours[butterfly.wing]!] as [number, number, number];
+        wings.forEach(([left, right], line) => {
+          if (left) put(left, { col: butterfly.col - 1, row: row + line }, colour, line ? 0.85 : 1);
+          if (right) put(right, { col: butterfly.col + 1, row: row + line }, colour, line ? 0.85 : 1);
+        });
+        put("i", { col: butterfly.col, row }, [0.86, 0.8, 0.7], 0.95);
+        put("'", { col: butterfly.col, row: row + 1 }, [0.86, 0.8, 0.7], 0.8);
       }
       return slot;
     };
@@ -814,7 +952,7 @@ const art = cells
       gl.bindTexture(gl.TEXTURE_2D, stateTexture);
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, cols, 1, gl.RED, gl.FLOAT, field);
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 1, plants.length, rows, gl.RED, gl.FLOAT, stems);
-      const beeCount = placeBees(t);
+      const beeCount = placeFliers(t);
       gl.bindBuffer(gl.ARRAY_BUFFER, beeBuffer);
       gl.bufferSubData(gl.ARRAY_BUFFER, 0, beeData);
 
@@ -973,6 +1111,7 @@ const art = cells
         if (plant.touching && hand) kick(plant.centre, () => hand!.speed * 0.01, 5);
       }
       fly(t, h);
+      flutter(t, h);
     };
 
     let visible = false;
@@ -985,7 +1124,8 @@ const art = cells
       lively < 0.02 &&
       plants.every((plant) => Math.abs(plant.y) < 0.01 && Math.abs(plant.v) < 0.01 && !plant.whipping) &&
       field.every((value, i) => Math.abs(value) < 0.01 && Math.abs(fieldVelocity[i]!) < 0.01) &&
-      bees.every((bee) => Math.abs(bee.vc) < 0.05 && Math.abs(bee.vr) < 0.05);
+      bees.every((bee) => Math.abs(bee.vc) < 0.05 && Math.abs(bee.vr) < 0.05) &&
+      butterflies.every((butterfly) => butterfly.landed);
 
     const tick = (now: number) => {
       frame = 0;

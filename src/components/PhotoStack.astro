@@ -4,8 +4,10 @@ import type { ImageMetadata } from "astro";
 
 /**
  * A pile of photos and clips. Drop files into src/assets/me/ (jpg, png, webp, mp4, webm);
- * they are sorted by filename, so prefix them to control order. Hover fans the pile out,
- * a click sends the top card to the back.
+ * they are sorted by filename, so prefix them to control order. A mouse hover or a tap opens
+ * the pile into an orb around the top photo; picking a card in the orb brings it to the front.
+ * A click on the top card, or a sideways swipe on touch, sends it to the back. A sideways trackpad
+ * swipe over the orb turns it.
  */
 const images = import.meta.glob<{ default: ImageMetadata }>("../assets/me/*.{jpg,jpeg,png,webp}", {
   eager: true,
@@ -53,38 +55,502 @@ const { width, height } = Astro.props;
         ) : (
           <video src={card.src} autoplay muted loop playsinline aria-hidden="true" />
         )}
+        <span class="pile-shade" />
       </figure>
     ))
   }
 </div>
 
 <script>
-  function bindPile() {
-    const pile = document.querySelector<HTMLElement>("[data-pile]");
-    const cards = pile ? Array.from(pile.querySelectorAll<HTMLElement>(".pile-card")) : [];
-    if (!pile || cards.length < 2) return;
+  type Pose = { x: number; y: number; z: number; rx: number; ry: number; rz: number; s: number; shade: number };
 
-    // Send the top card to the back; every other card moves one slot up.
-    const shuffle = () => {
-      const top = cards.find((card) => card.dataset.i === "0");
-      if (!top) return;
-      for (const card of cards) {
-        const next = card === top ? cards.length - 1 : Number(card.dataset.i) - 1;
-        card.dataset.i = String(next);
-        card.style.setProperty("--i", String(next));
+  const poseKeys = ["x", "y", "z", "rx", "ry", "rz", "s", "shade"] as const satisfies readonly (keyof Pose)[];
+
+  interface Card {
+    el: HTMLElement;
+    shade: HTMLElement;
+    /** Place on the ring; a reorder swaps it between the two cards that change role, so no other card moves. */
+    angle: number;
+    tilt: number;
+    drift: number;
+    /** Resting rotation from the pile's CSS (`--r` for the card's slot). */
+    rest: number;
+    /** A flipped card swings out to `liftX` until `liftUntil`, then tucks in at the back. */
+    liftUntil: number;
+    liftX: number;
+    /** Under a finger: the gesture writes the pose and the springs leave it alone. */
+    held: boolean;
+    /** Let go after a pull: springs home on the bounce-back spring until it settles. */
+    snapping: boolean;
+    pose: Pose;
+    velocity: Pose;
+  }
+
+  type Orb =
+    | { open: false }
+    | {
+        open: true;
+        via: "mouse" | "touch";
+        radius: number;
+        offsetX: number;
+        centerX: number;
+        centerY: number;
+        pointerX: number;
+        pointerY: number;
+      };
+
+  type Drag = { pointerId: number; lastX: number; lastTime: number; velocity: number };
+
+  type Gesture =
+    | { kind: "idle" }
+    | { kind: "press"; pointerId: number; x: number; y: number; target: Card | undefined }
+    | ({ kind: "flip"; card: Card; startX: number } & Drag)
+    | ({ kind: "spin" } & Drag);
+
+  type Spring = { stiffness: number; damping: number };
+
+  // Apple-style spring parameters (perceptual duration in seconds, bounce) for unit mass.
+  const spring = (duration: number, bounce: number): Spring => {
+    const omega = (2 * Math.PI) / duration;
+    return { stiffness: omega ** 2, damping: 2 * (1 - bounce) * omega };
+  };
+
+  const orbSpring = spring(0.5, 0.2);
+  const pileSpring = spring(0.3, 0);
+  // UIScrollView's bounce back as reconstructed in super-ultra/ScrollMechanics: mass 1, stiffness 100,
+  // critically damped, so a released pull snaps home without overshoot.
+  const bounceSpring: Spring = { stiffness: 100, damping: 20 };
+  const liftDuration = 200;
+  const perspective = 640;
+  const spinSpeed = (2 * Math.PI) / 48;
+  const flickVelocity = 0.11;
+  const rubberCoefficient = 0.55;
+  const tilts = [-6, 5, -3, 7, -5, 4];
+  const drifts = [-14, 10, -6, 16, -12, 8];
+
+  const zeroPose = (): Pose => ({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, s: 0, shade: 0 });
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+  // UIScrollView's rubber band: a pull of x against a view `dimension` wide moves the card
+  // c·x·d / (d + c·x), resisting from the first pixel and harder the further it goes. Returns the
+  // card offset and the curve's slope there, so a release hands the spring a matching velocity.
+  const rubberBand = (drag: number, dimension: number): [offset: number, slope: number] => {
+    const pull = Math.abs(drag);
+    const stretch = dimension + rubberCoefficient * pull;
+    return [(Math.sign(drag) * rubberCoefficient * pull * dimension) / stretch, (rubberCoefficient * dimension ** 2) / stretch ** 2];
+  };
+
+  function bindPile(signal: AbortSignal) {
+    const pile = document.querySelector<HTMLElement>("[data-pile]");
+    const elements = pile ? Array.from(pile.querySelectorAll<HTMLElement>(".pile-card")) : [];
+    if (!pile || elements.length < 2) return;
+
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    const finePointer = matchMedia("(hover: hover) and (pointer: fine)");
+    const count = elements.length;
+
+    const slotOf = (card: Card) => Number(card.el.dataset.i);
+    const restOf = (el: HTMLElement) => parseFloat(getComputedStyle(el).getPropertyValue("--r")) || 0;
+    const pilePose = (slot: number, rest: number): Pose => ({
+      x: slot * 3,
+      y: slot * -3,
+      z: -slot,
+      rx: 0,
+      ry: 0,
+      rz: rest,
+      s: 1,
+      shade: 0,
+    });
+
+    const cards: Card[] = elements.flatMap((el, index) => {
+      const shade = el.querySelector<HTMLElement>(".pile-shade");
+      if (!shade) return [];
+      const rest = restOf(el);
+      return {
+        el,
+        shade,
+        angle: (2 * Math.PI * index) / count + Math.PI / count,
+        tilt: tilts[index % tilts.length],
+        drift: drifts[index % drifts.length],
+        rest,
+        liftUntil: 0,
+        liftX: 0,
+        held: false,
+        snapping: false,
+        pose: pilePose(Number(el.dataset.i), rest),
+        velocity: zeroPose(),
+      };
+    });
+
+    let orb: Orb = { open: false };
+    let gesture: Gesture = { kind: "idle" };
+    let hovered: Card | undefined;
+    let touchEndedAt = -Infinity;
+    let spin = 0;
+    let spinRate = 0;
+    let frame = 0;
+    let lastTime = 0;
+
+    const topCard = () => cards.find((card) => slotOf(card) === 0);
+    // The front photo isn't on the ring, so the ring spaces the others evenly, in the order their angles give: swapping
+    // angles when a card comes to the front keeps every other card where it was.
+    let ringAngle = new Map<Card, number>();
+    const spaceRing = () => {
+      const ring = cards.filter((card) => slotOf(card) !== 0).sort((a, b) => a.angle - b.angle);
+      ringAngle = new Map(ring.map((card, i) => [card, (2 * Math.PI * (i + 0.5)) / ring.length]));
+    };
+    const reach = (radius: number) => ({ x: radius + 72, y: radius * 0.45 + 80 });
+
+    const target = (card: Card, now: number): Pose => {
+      const slot = slotOf(card);
+      if (card.liftUntil > now) {
+        return { x: card.liftX, y: -12, z: count, rx: 0, ry: 0, rz: Math.sign(card.liftX) * 10, s: 1.04, shade: 0 };
       }
-      top.classList.remove("is-shuffling");
-      void top.offsetWidth; // restart the animation when clicking quickly
-      top.classList.add("is-shuffling");
+      // All cards leave the pile in one move: one after another, the photo showing at its edge kept changing.
+      if (!orb.open) return pilePose(slot, card.rest);
+
+      const { x: reachX, y: reachY } = reach(orb.radius);
+      const nx = clamp((orb.pointerX - orb.centerX) / reachX, -1, 1);
+      const ny = clamp((orb.pointerY - orb.centerY) / reachY, -1, 1);
+      if (slot === 0) {
+        return { x: orb.offsetX + nx * 6, y: ny * 6, z: 0, rx: ny * -10, ry: nx * 14, rz: 0, s: 1.08, shade: 0 };
+      }
+
+      // The pointer turns and tips the ring: near cards follow it, far ones drift the other way.
+      const theta = (ringAngle.get(card) ?? card.angle) + spin + nx * 0.55;
+      const pitch = 0.24 + ny * 0.14;
+      const ringX = orb.radius * Math.sin(theta);
+      const ringZ = orb.radius * Math.cos(theta);
+      const y = card.drift * Math.cos(pitch) + ringZ * Math.sin(pitch);
+      const z = ringZ * Math.cos(pitch) - card.drift * Math.sin(pitch);
+      const depth = perspective / (perspective - z);
+      const lifted = card === hovered;
+      return {
+        x: orb.offsetX + ringX * depth,
+        y: y * depth,
+        z,
+        rx: 0,
+        ry: Math.sin(theta) * (lifted ? 10 : 28),
+        rz: card.tilt,
+        s: 0.7 * depth * (lifted ? 1.08 : 1),
+        shade: lifted ? 0 : 0.5 * (1 - (z + orb.radius) / (2 * orb.radius)),
+      };
     };
 
-    pile.addEventListener("click", shuffle);
+    const render = ({ el, shade, pose }: Card, goal: Pose) => {
+      // Closed, the pile order applies at once, so returning cards slide under the top photo.
+      const layer = orb.open ? pose.z : goal.z;
+      el.style.transform = `translate(${pose.x}px, ${pose.y}px) perspective(800px) rotateX(${pose.rx}deg) rotateY(${pose.ry}deg) rotate(${pose.rz}deg) scale(${pose.s})`;
+      el.style.zIndex = String(200 + Math.round(layer));
+      shade.style.opacity = String(pose.shade);
+    };
+
+    const step = (card: Card, goal: Pose, dt: number, { stiffness, damping }: Spring) => {
+      for (let remaining = dt; remaining > 0; remaining -= 1 / 120) {
+        const h = Math.min(remaining, 1 / 120);
+        for (const key of poseKeys) {
+          const force = -stiffness * (card.pose[key] - goal[key]) - damping * card.velocity[key];
+          card.velocity[key] += force * h;
+          card.pose[key] += card.velocity[key] * h;
+        }
+      }
+      const settled = poseKeys.every(
+        (key) => Math.abs(card.pose[key] - goal[key]) < 0.005 && Math.abs(card.velocity[key]) < 0.005,
+      );
+      if (settled) {
+        card.pose = goal;
+        card.velocity = zeroPose();
+      }
+      return settled;
+    };
+
+    const tick = (now: number) => {
+      frame = 0;
+      const dt = clamp((now - lastTime) / 1000, 0, 1 / 30);
+      lastTime = now;
+      const animate = !reduceMotion.matches;
+
+      if (orb.open && animate && gesture.kind !== "spin") {
+        spinRate += ((hovered ? 0 : spinSpeed) - spinRate) * (1 - Math.exp(-dt * 2));
+        spin += spinRate * dt;
+      }
+
+      let running = orb.open && animate;
+      spaceRing();
+      for (const card of cards) {
+        const goal = target(card, now);
+        const lifting = card.liftUntil > now;
+        if (!animate && !card.held) {
+          card.pose = goal;
+          card.velocity = zeroPose();
+        } else if (!card.held) {
+          const motion = card.snapping ? bounceSpring : orb.open || lifting ? orbSpring : pileSpring;
+          const settled = step(card, goal, dt, motion);
+          if (settled) card.snapping = false;
+          if (!settled || lifting) running = true;
+        }
+        render(card, goal);
+      }
+      if (running) frame = requestAnimationFrame(tick);
+    };
+
+    const schedule = () => {
+      if (frame) return;
+      lastTime = performance.now();
+      frame = requestAnimationFrame(tick);
+    };
+
+    const setSlot = (card: Card, slot: number) => {
+      card.el.dataset.i = String(slot);
+      card.el.style.setProperty("--i", String(slot));
+      card.rest = restOf(card.el);
+    };
+
+    const swapPlaces = (leaving: Card, arriving: Card) => {
+      [leaving.angle, arriving.angle] = [arriving.angle, leaving.angle];
+    };
+
+    // Send the top card to the back, swinging out toward `side`; every other card moves one slot up.
+    const shuffle = (side: 1 | -1 = 1) => {
+      const top = topCard();
+      const next = cards.find((card) => slotOf(card) === 1);
+      if (!top || !next) return;
+      if (orb.open) swapPlaces(top, next);
+      for (const card of cards) setSlot(card, card === top ? count - 1 : slotOf(card) - 1);
+      if (!orb.open && !reduceMotion.matches) {
+        top.liftUntil = performance.now() + liftDuration;
+        top.liftX = side * Math.max(52, Math.abs(top.pose.x) + 24);
+      }
+      schedule();
+    };
+
+    const bringToFront = (picked: Card) => {
+      const from = slotOf(picked);
+      const top = topCard();
+      if (top) swapPlaces(top, picked);
+      for (const card of cards) {
+        const slot = slotOf(card);
+        if (card === picked) setSlot(card, 0);
+        else if (slot < from) setSlot(card, slot + 1);
+      }
+      hovered = undefined;
+      schedule();
+    };
+
+    const cardFor = (target: EventTarget | null) => {
+      const el = target instanceof Element ? target.closest(".pile-card") : null;
+      return cards.find((card) => card.el === el);
+    };
+
+    const openOrb = (via: "mouse" | "touch", pointer?: { x: number; y: number }) => {
+      const rect = pile.getBoundingClientRect();
+      const pileX = rect.left + rect.width / 2;
+      const radius = clamp(innerWidth / 2 - 70, 112, 200);
+      // Slide the orb right when the column hugs the window's left edge, so the ring stays on screen.
+      const offsetX = Math.max(0, radius + 60 - pileX);
+      const centerX = pileX + offsetX;
+      const centerY = rect.top + rect.height / 2;
+      orb = {
+        open: true,
+        via,
+        radius,
+        offsetX,
+        centerX,
+        centerY,
+        pointerX: pointer?.x ?? centerX,
+        pointerY: pointer?.y ?? centerY,
+      };
+      schedule();
+    };
+
+    const close = () => {
+      if (!orb.open) return;
+      orb = { open: false };
+      hovered = undefined;
+      schedule();
+    };
+
+    const tap = (picked: Card | undefined) => {
+      if (!orb.open) {
+        if (reduceMotion.matches) shuffle();
+        else openOrb("touch");
+      } else if (picked && slotOf(picked) !== 0) {
+        bringToFront(picked);
+      } else {
+        close();
+      }
+    };
+
+    const startDrag = (event: PointerEvent, press: Extract<Gesture, { kind: "press" }>) => {
+      const dx = event.clientX - press.x;
+      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(event.clientY - press.y)) return;
+      const top = topCard();
+      const drag: Drag = { pointerId: press.pointerId, lastX: press.x, lastTime: event.timeStamp, velocity: 0 };
+      if (orb.open) {
+        gesture = { kind: "spin", ...drag };
+      } else if (top) {
+        top.held = true;
+        gesture = { kind: "flip", card: top, startX: press.x, ...drag };
+      } else {
+        return;
+      }
+      pile.setPointerCapture(event.pointerId);
+    };
+
+    const release = (event: PointerEvent, cancelled: boolean) => {
+      if (gesture.kind === "idle" || event.pointerId !== gesture.pointerId) return;
+      const ended = gesture;
+      gesture = { kind: "idle" };
+      touchEndedAt = event.timeStamp;
+
+      if (ended.kind === "press") {
+        if (!cancelled) tap(ended.target);
+      } else if (ended.kind === "spin") {
+        if (orb.open) spinRate = clamp((ended.velocity * 1000) / orb.radius, -6, 6);
+      } else {
+        const { card } = ended;
+        const dx = ended.lastX - ended.startX;
+        // A finger that stopped before lifting carries no speed, like UIKit's pan gestures.
+        const velocity = event.timeStamp - ended.lastTime > 60 ? 0 : ended.velocity;
+        const [, slope] = rubberBand(dx, innerWidth);
+        card.held = false;
+        card.velocity = { ...zeroPose(), x: velocity * 1000 * slope, rz: velocity * 80 * slope };
+        // Only a flick throws the card to the back; any other release, however far, snaps it home.
+        if (!cancelled && Math.abs(velocity) > flickVelocity && Math.sign(velocity) === Math.sign(dx)) {
+          shuffle(velocity < 0 ? -1 : 1);
+        } else {
+          card.snapping = true;
+        }
+      }
+      schedule();
+    };
+
+    pile.addEventListener("pointerenter", (event) => {
+      if (orb.open || event.pointerType !== "mouse" || !finePointer.matches || reduceMotion.matches) return;
+      openOrb("mouse", { x: event.clientX, y: event.clientY });
+    });
+    pile.addEventListener("pointerover", (event) => {
+      const card = cardFor(event.target);
+      hovered = orb.open && card && slotOf(card) !== 0 ? card : undefined;
+    });
+    pile.addEventListener("pointerout", (event) => {
+      if (!cardFor(event.relatedTarget)) hovered = undefined;
+    });
+
+    pile.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse" || !event.isPrimary) return;
+      gesture = { kind: "press", pointerId: event.pointerId, x: event.clientX, y: event.clientY, target: cardFor(event.target) };
+    });
+    pile.addEventListener("pointermove", (event) => {
+      if (gesture.kind === "press" && event.pointerId === gesture.pointerId) startDrag(event, gesture);
+      if ((gesture.kind !== "flip" && gesture.kind !== "spin") || event.pointerId !== gesture.pointerId) return;
+      const delta = event.clientX - gesture.lastX;
+      const elapsed = event.timeStamp - gesture.lastTime;
+      if (elapsed > 0) gesture.velocity = 0.8 * (delta / elapsed) + 0.2 * gesture.velocity;
+      gesture.lastX = event.clientX;
+      gesture.lastTime = event.timeStamp;
+
+      if (gesture.kind === "spin") {
+        if (orb.open) spin += delta / orb.radius;
+        spinRate = 0;
+        schedule();
+      } else {
+        const { card } = gesture;
+        const [x] = rubberBand(event.clientX - gesture.startX, innerWidth);
+        card.pose = { ...pilePose(0, card.rest), x, y: Math.abs(x) * -0.06, rz: card.rest + x * 0.08 };
+        card.velocity = zeroPose();
+        render(card, card.pose);
+      }
+    });
+    pile.addEventListener("pointerup", (event) => release(event, false));
+    pile.addEventListener("pointercancel", (event) => release(event, true));
+
+    pile.addEventListener("click", (event) => {
+      // Touch taps were handled on pointerup; ignore the click that follows them.
+      if (event.timeStamp - touchEndedAt < 800) return;
+      const card = cardFor(event.target);
+      if (orb.open && card && slotOf(card) !== 0) bringToFront(card);
+      else shuffle();
+    });
     pile.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         shuffle();
       }
     });
+
+    window.addEventListener(
+      "pointermove",
+      (event) => {
+        if (!orb.open || orb.via !== "mouse" || event.pointerType !== "mouse") return;
+        orb.pointerX = event.clientX;
+        orb.pointerY = event.clientY;
+        const { x: reachX, y: reachY } = reach(orb.radius);
+        const dx = (orb.pointerX - orb.centerX) / reachX;
+        const dy = (orb.pointerY - orb.centerY) / reachY;
+        if (dx * dx + dy * dy > 1) close();
+      },
+      { passive: true, signal },
+    );
+    // A tap outside the open orb only closes it, like dismissing a menu: its click is swallowed.
+    let swallowClickUntil = -Infinity;
+    document.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (!orb.open || orb.via !== "touch" || (event.target instanceof Node && pile.contains(event.target))) return;
+        swallowClickUntil = event.timeStamp + 800;
+        close();
+      },
+      { capture: true, signal },
+    );
+    document.addEventListener(
+      "click",
+      (event) => {
+        if (event.timeStamp > swallowClickUntil) return;
+        swallowClickUntil = -Infinity;
+        event.preventDefault();
+        event.stopPropagation();
+      },
+      { capture: true, signal },
+    );
+    // A sideways trackpad swipe over the open orb turns it, front cards following the fingers; the
+    // system's scroll momentum carries the turn on. Cancelling it also keeps swipe-back from firing.
+    window.addEventListener(
+      "wheel",
+      (event) => {
+        if (!orb.open || orb.via !== "mouse" || Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+        event.preventDefault();
+        spin -= (event.deltaX * (event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16 : 1)) / orb.radius;
+        spinRate = 0;
+        schedule();
+      },
+      { passive: false, signal },
+    );
+    window.addEventListener(
+      "scroll",
+      () => {
+        if (!orb.open) return;
+        const rect = pile.getBoundingClientRect();
+        orb.centerX = rect.left + rect.width / 2 + orb.offsetX;
+        orb.centerY = rect.top + rect.height / 2;
+      },
+      { passive: true, signal },
+    );
+    document.documentElement.addEventListener(
+      "pointerleave",
+      (event) => {
+        if (event.pointerType === "mouse") close();
+      },
+      { signal },
+    );
+    window.addEventListener("blur", close, { signal });
+    signal.addEventListener("abort", () => cancelAnimationFrame(frame));
   }
-  document.addEventListener("astro:page-load", bindPile);
+
+  let binding: AbortController | undefined;
+  document.addEventListener("astro:page-load", () => {
+    binding?.abort();
+    binding = new AbortController();
+    bindPile(binding.signal);
+  });
 </script>

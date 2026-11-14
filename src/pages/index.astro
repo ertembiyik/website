@@ -12,10 +12,10 @@ import { connect, links, profile, writing } from "../data/site";
 const byOrder = <T extends { data: { order: number } }>(a: T, b: T) =>
   a.data.order - b.data.order;
 
-// "Feb 2026 — now" → "2026 – now"; "Aug 2022 — Nov 2025" → "2022 – 2025"; "Feb 2022 — Jul 2022" → "2022".
+// "Feb 2026 – now" → "2026 – now"; "Aug 2022 – Nov 2025" → "2022 – 2025"; "Feb 2022 – Jul 2022" → "2022".
 // Full periods live on detail pages.
 const years = (period: string) => {
-  const parts = period.split(/\s*[—–-]\s*/).map((part) => part.match(/\d{4}/)?.[0] ?? part);
+  const parts = period.split(/\s*[–-]\s*/).map((part) => part.match(/\d{4}/)?.[0] ?? part);
   return [...new Set(parts)].join(" – ");
 };
 
@@ -51,8 +51,8 @@ const notes = [
         </p>
         <p>
           Now founding engineer at{" "}
-          <a class="inline-app" href="/work/pool" data-morph-scope="intro"><AppIcon src={poolIcon} size={18} loading="eager" morph="icon-pool" /><span class="morph" data-morph="title-pool">Pool</span></a>{" "}
-          — the fastest way to save anything with a screenshot. Before that, three
+          <a class="inline-app" href="/work/pool" data-morph-scope="intro"><AppIcon src={poolIcon} size={18} loading="eager" morph="icon-pool" /><span class="morph" data-morph="title-pool">Pool</span></a>,
+          the fastest way to save anything with a screenshot. Before that, three
           years at{" "}
           <a class="inline-app" href="/work/vk" data-morph-scope="intro"><AppIcon src={vkIcon} size={18} loading="eager" morph="icon-vk" /><span class="morph" data-morph="title-vk">VK</span></a>{" "}
           shipping a superapp to 100M+ people

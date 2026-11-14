@@ -298,6 +298,9 @@ h3 {
 .pile[role="button"] .pile-card[data-i="3"] { --r: 7deg; }
 .pile[role="button"] .pile-card[data-i="4"] { --r: -5deg; }
 .pile[role="button"] .pile-card[data-i="5"] { --r: 9deg; }
+.pile[role="button"] .pile-card[data-i="6"] { --r: -4deg; }
+.pile[role="button"] .pile-card[data-i="7"] { --r: 6deg; }
+.pile[role="button"] .pile-card[data-i="8"] { --r: -7deg; }
 
 .pile-card :is(img, video) {
   width: 100%;

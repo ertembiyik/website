@@ -80,8 +80,9 @@ const { width, height } = Astro.props;
     liftX: number;
     /** Under a finger: the gesture writes the pose and the springs leave it alone. */
     held: boolean;
-    /** Let go after a pull: springs home on the bounce-back spring until it settles. */
-    snapping: boolean;
+    /** A one-off spring for the move under way (snapping home after a pull, the deck stepping up after a throw),
+     * used until the card settles. */
+    spring: Spring | undefined;
     pose: Pose;
     velocity: Pose;
   }
@@ -104,7 +105,7 @@ const { width, height } = Astro.props;
   type Gesture =
     | { kind: "idle" }
     | { kind: "press"; pointerId: number; x: number; y: number; target: Card | undefined }
-    | ({ kind: "flip"; card: Card; startX: number } & Drag)
+    | ({ kind: "flip"; card: Card; startX: number; grabX: number } & Drag)
     | ({ kind: "spin" } & Drag);
 
   type Spring = { stiffness: number; damping: number };
@@ -117,14 +118,20 @@ const { width, height } = Astro.props;
 
   const orbSpring = spring(0.5, 0.2);
   const pileSpring = spring(0.3, 0);
+  // A throw carries momentum, so the deck answers it with a little bounce; a press answers at once and plainly.
+  const deckSpring = spring(0.42, 0.25);
+  const pressSpring = spring(0.2, 0);
+  const pressScale = 0.95;
   // UIScrollView's bounce back as reconstructed in super-ultra/ScrollMechanics: mass 1, stiffness 100,
   // critically damped, so a released pull snaps home without overshoot.
   const bounceSpring: Spring = { stiffness: 100, damping: 20 };
   const liftDuration = 200;
   const perspective = 640;
   const spinSpeed = (2 * Math.PI) / 48;
-  const flickVelocity = 0.11;
   const rubberCoefficient = 0.55;
+  // UIScrollView's normal deceleration: a release at v px/ms comes to rest v·d/(1−d) px further on.
+  const decelerationRate = 0.998;
+  const project = (velocity: number) => (velocity * decelerationRate) / (1 - decelerationRate);
   const tilts = [-6, 5, -3, 7, -5, 4];
   const drifts = [-14, 10, -6, 16, -12, 8];
 
@@ -148,6 +155,13 @@ const { width, height } = Astro.props;
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
     const finePointer = matchMedia("(hover: hover) and (pointer: fine)");
     const count = elements.length;
+    // A swiped card follows the finger 1:1 across its own width, then stretches on UIScrollView's rubber band.
+    const follow = (drag: number): [offset: number, slope: number] => {
+      const free = pile.offsetWidth;
+      if (Math.abs(drag) <= free) return [drag, 1];
+      const [extra, slope] = rubberBand(drag - Math.sign(drag) * free, innerWidth);
+      return [Math.sign(drag) * free + extra, slope];
+    };
 
     const slotOf = (card: Card) => Number(card.el.dataset.i);
     const restOf = (el: HTMLElement) => parseFloat(getComputedStyle(el).getPropertyValue("--r")) || 0;
@@ -176,7 +190,7 @@ const { width, height } = Astro.props;
         liftUntil: 0,
         liftX: 0,
         held: false,
-        snapping: false,
+        spring: undefined,
         pose: pilePose(Number(el.dataset.i), rest),
         velocity: zeroPose(),
       };
@@ -201,7 +215,13 @@ const { width, height } = Astro.props;
     };
     const reach = (radius: number) => ({ x: radius + 72, y: radius * 0.45 + 80 });
 
+    // The card under a finger shrinks a touch the moment it's pressed, before the finger lifts.
+    const pressed = () => (gesture.kind !== "press" ? undefined : orb.open ? gesture.target : topCard());
     const target = (card: Card, now: number): Pose => {
+      const pose = place(card, now);
+      return card === pressed() ? { ...pose, s: pose.s * pressScale } : pose;
+    };
+    const place = (card: Card, now: number): Pose => {
       const slot = slotOf(card);
       if (card.liftUntil > now) {
         return { x: card.liftX, y: -12, z: count, rx: 0, ry: 0, rz: Math.sign(card.liftX) * 10, s: 1.04, shade: 0 };
@@ -284,9 +304,9 @@ const { width, height } = Astro.props;
           card.pose = goal;
           card.velocity = zeroPose();
         } else if (!card.held) {
-          const motion = card.snapping ? bounceSpring : orb.open || lifting ? orbSpring : pileSpring;
+          const motion = card === pressed() ? pressSpring : (card.spring ?? (orb.open || lifting ? orbSpring : pileSpring));
           const settled = step(card, goal, dt, motion);
-          if (settled) card.snapping = false;
+          if (settled) card.spring = undefined;
           if (!settled || lifting) running = true;
         }
         render(card, goal);
@@ -310,8 +330,9 @@ const { width, height } = Astro.props;
       [leaving.angle, arriving.angle] = [arriving.angle, leaving.angle];
     };
 
-    // Send the top card to the back, swinging out toward `side`; every other card moves one slot up.
-    const shuffle = (side: 1 | -1 = 1) => {
+    // Send the top card to the back, swinging out toward `side` (as far as `reach`, where a throw was headed); every
+    // other card moves one slot up.
+    const shuffle = (side: 1 | -1 = 1, reach = 0) => {
       const top = topCard();
       const next = cards.find((card) => slotOf(card) === 1);
       if (!top || !next) return;
@@ -319,7 +340,8 @@ const { width, height } = Astro.props;
       for (const card of cards) setSlot(card, card === top ? count - 1 : slotOf(card) - 1);
       if (!orb.open && !reduceMotion.matches) {
         top.liftUntil = performance.now() + liftDuration;
-        top.liftX = side * Math.max(52, Math.abs(top.pose.x) + 24);
+        top.liftX = side * clamp(Math.max(Math.abs(reach), Math.abs(top.pose.x) + 24), 52, pile.offsetWidth * 1.6);
+        for (const card of cards) card.spring = deckSpring;
       }
       schedule();
     };
@@ -390,7 +412,8 @@ const { width, height } = Astro.props;
         gesture = { kind: "spin", ...drag };
       } else if (top) {
         top.held = true;
-        gesture = { kind: "flip", card: top, startX: press.x, ...drag };
+        // Pick the card up where it is, even mid-flight, so nothing jumps under the finger.
+        gesture = { kind: "flip", card: top, startX: press.x, grabX: top.pose.x, ...drag };
       } else {
         return;
       }
@@ -409,17 +432,17 @@ const { width, height } = Astro.props;
         if (orb.open) spinRate = clamp((ended.velocity * 1000) / orb.radius, -6, 6);
       } else {
         const { card } = ended;
-        const dx = ended.lastX - ended.startX;
         // A finger that stopped before lifting carries no speed, like UIKit's pan gestures.
         const velocity = event.timeStamp - ended.lastTime > 60 ? 0 : ended.velocity;
-        const [, slope] = rubberBand(dx, innerWidth);
+        const [x, slope] = follow(ended.grabX + ended.lastX - ended.startX);
         card.held = false;
         card.velocity = { ...zeroPose(), x: velocity * 1000 * slope, rz: velocity * 80 * slope };
-        // Only a flick throws the card to the back; any other release, however far, snaps it home.
-        if (!cancelled && Math.abs(velocity) > flickVelocity && Math.sign(velocity) === Math.sign(dx)) {
-          shuffle(velocity < 0 ? -1 : 1);
+        // Where the card would coast to decides: past most of its width it goes to the back, otherwise home.
+        const landing = x + project(velocity * slope);
+        if (!cancelled && Math.abs(landing) > pile.offsetWidth * 0.6) {
+          shuffle(landing < 0 ? -1 : 1, landing);
         } else {
-          card.snapping = true;
+          card.spring = bounceSpring;
         }
       }
       schedule();
@@ -440,6 +463,7 @@ const { width, height } = Astro.props;
     pile.addEventListener("pointerdown", (event) => {
       if (event.pointerType === "mouse" || !event.isPrimary) return;
       gesture = { kind: "press", pointerId: event.pointerId, x: event.clientX, y: event.clientY, target: cardFor(event.target) };
+      schedule();
     });
     pile.addEventListener("pointermove", (event) => {
       if (gesture.kind === "press" && event.pointerId === gesture.pointerId) startDrag(event, gesture);
@@ -456,7 +480,7 @@ const { width, height } = Astro.props;
         schedule();
       } else {
         const { card } = gesture;
-        const [x] = rubberBand(event.clientX - gesture.startX, innerWidth);
+        const [x] = follow(gesture.grabX + event.clientX - gesture.startX);
         card.pose = { ...pilePose(0, card.rest), x, y: Math.abs(x) * -0.06, rz: card.rest + x * 0.08 };
         card.velocity = zeroPose();
         render(card, card.pose);

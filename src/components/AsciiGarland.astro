@@ -269,7 +269,8 @@ const art = cells
   const idleFps = 24;
   // Butterflies: wing colours (Display P3) and the wings from open to folded, either side of a body two rows tall:
   // forewings beside it on the top row, hindwings beside its tail below.
-  const wingColours = [[0.46, 0.77, 1], [0.95, 0.97, 1]] as const;
+  // Sky blue, white, lemon and lilac.
+  const wingColours = [[0.46, 0.77, 1], [0.95, 0.97, 1], [1, 0.89, 0.43], [0.79, 0.63, 1]] as const;
   const wingFrames = [
     [["\\", "/"], ["/", "\\"]],
     [["|", "|"], ["|", "|"]],
@@ -758,6 +759,12 @@ const art = cells
       const pool = far.length ? far : free.length ? free : choices;
       return pool[Math.floor(Math.random() * pool.length)];
     };
+    // A random wing colour, one no other butterfly in view is wearing while there are any left.
+    const wingFor = () => {
+      const unused = wingColours.map((_, i) => i).filter((i) => !butterflies.some((other) => other.wing === i));
+      const pool = unused.length ? unused : wingColours.map((_, i) => i);
+      return pool[Math.floor(Math.random() * pool.length)]!;
+    };
     const flock = () => {
       const width = view.last - view.first;
       const wanted = clamp(Math.round(width / butterflySpacing), 1, maxButterflies);
@@ -778,7 +785,7 @@ const art = cells
           burst: 0,
           glide: 0,
           landed: false,
-          wing: butterflies.length % wingColours.length,
+          wing: wingFor(),
         });
       }
       const count = clamp(Math.round(width / beeSpacing), 1, maxBees);

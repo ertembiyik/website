@@ -209,7 +209,22 @@ const art = cells
   type Bee = { col: number; row: number; vc: number; vr: number; target: number; shift: number; until: number; phase: number; trail: Spot[]; dropped: number };
   /** A butterfly drifts between flowers on bobbing wingbeats, lands on a head and rests there opening and closing its
    * wings; `flap` is its wingbeat phase and `wing` its colour. Like a bee it flies across the whole width. */
-  type Butterfly = { col: number; row: number; vc: number; vr: number; target: number; shift: number; until: number; phase: number; flap: number; landed: boolean; wing: number };
+  type Butterfly = {
+    col: number;
+    row: number;
+    vc: number;
+    vr: number;
+    target: number;
+    shift: number;
+    until: number;
+    phase: number;
+    flap: number;
+    /** It flaps in bursts until `burst`, then glides with its wings held open until `glide`. */
+    burst: number;
+    glide: number;
+    landed: boolean;
+    wing: number;
+  };
 
   // Plants spring toward the wave field with periods in this range; it drifts slowly across the bed
   // so neighbours move together instead of tearing apart.
@@ -254,11 +269,11 @@ const art = cells
   const idleFps = 24;
   // Butterflies: wing colours (Display P3) and the wings from open to folded, either side of a body two rows tall:
   // forewings beside it on the top row, hindwings beside its tail below.
-  const wingColours = [[1, 0.54, 0.16], [0.46, 0.77, 1], [1, 0.89, 0.43], [0.79, 0.63, 1]] as const;
+  const wingColours = [[0.46, 0.77, 1], [0.95, 0.97, 1]] as const;
   const wingFrames = [
     [["\\", "/"], ["/", "\\"]],
     [["|", "|"], ["|", "|"]],
-    [["'", "'"], ["", ""]],
+    [["'", "'"], [".", "."]],
   ] as const;
   // After this long with no scrolling, pointer or keys anywhere, the breeze dies down, the bees land,
   // and drawing stops until something moves again.
@@ -760,6 +775,8 @@ const art = cells
           until: performance.now() / 1000 + 2 + Math.random() * 5,
           phase: Math.random() * 10,
           flap: Math.random() * 6,
+          burst: 0,
+          glide: 0,
           landed: false,
           wing: butterflies.length % wingColours.length,
         });
@@ -848,13 +865,22 @@ const art = cells
           butterfly.flap += h * 2 * Math.PI * 0.45 * lively;
           continue;
         }
-        butterfly.flap += h * 2 * Math.PI * 4;
+        // A few quick wingbeats, then a glide on open wings, sinking a little; a scared butterfly just flaps.
+        const gliding = t < butterfly.glide && flee === 0;
+        if (!gliding) {
+          butterfly.flap += h * 2 * Math.PI * 5;
+          if (t > butterfly.burst && Math.cos(butterfly.flap) > 0.97 && flee === 0) {
+            butterfly.flap = 0;
+            butterfly.glide = t + 0.25 + Math.random() * 0.45;
+            butterfly.burst = butterfly.glide + 0.5 + Math.random() * 0.9;
+          }
+        }
         const landing = (t > butterfly.until || lively < 0.4) && flee === 0;
         const weave = landing ? 0 : Math.sin(t * 0.6 + butterfly.phase) * 7 + Math.sin(t * 1.7 + butterfly.phase * 2) * 3;
         const aimCol = headCol + weave;
         const aimRow = landing ? headRow : headRow - 3 - (1 + Math.sin(t * 0.8 + butterfly.phase)) * 2.5;
         let ac = (aimCol - butterfly.col) * 2 - butterfly.vc * 1.8 + Math.sin(t * 3.1 + butterfly.phase) * 4;
-        let ar = (aimRow - butterfly.row) * 2.5 - butterfly.vr * 2.2;
+        let ar = (aimRow - butterfly.row) * 2.5 - butterfly.vr * 2.2 + (gliding ? 7 : 0);
         if (flee) {
           const distance = Math.hypot(dc, dr) || 1;
           ac += (dc / distance) * flee * 18;
@@ -892,7 +918,7 @@ const art = cells
       for (const butterfly of butterflies) {
         const open = (1 + Math.cos(butterfly.flap)) / 2;
         const wings = wingFrames[lively < 0.15 || open > 0.66 ? 0 : open > 0.33 ? 1 : 2];
-        const row = butterfly.row + (butterfly.landed ? 0 : Math.sin(butterfly.flap) * 0.35);
+        const row = butterfly.row + (butterfly.landed || t < butterfly.glide ? 0 : Math.sin(butterfly.flap) * 0.3);
         const colour = [...wingColours[butterfly.wing]!] as [number, number, number];
         wings.forEach(([left, right], line) => {
           if (left) put(left, { col: butterfly.col - 1, row: row + line }, colour, line ? 0.85 : 1);

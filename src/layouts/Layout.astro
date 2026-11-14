@@ -3,6 +3,7 @@ import "../styles/globals.css";
 import { ClientRouter } from "astro:transitions";
 import interUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
 import geistMonoUrl from "@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2?url";
+import ogCardUrl from "../assets/og-card.png?url";
 import { links, profile } from "../data/site";
 
 interface Props {
@@ -13,7 +14,8 @@ interface Props {
 
 const { title, description = profile.description, home = false } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
-const socialImage = new URL("/og-card.png", Astro.site);
+// Hashed, so a new card reaches link previews that cached the old one.
+const socialImage = new URL(ogCardUrl, Astro.site);
 const pageTitle = home ? title : `${title} · ${profile.name}`;
 
 // Every page except the 404 has a Markdown twin for agents (see src/data/markdown.ts).

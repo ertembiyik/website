@@ -91,7 +91,6 @@ const { width, height } = Astro.props;
     | {
         open: true;
         via: "mouse" | "touch";
-        openedAt: number;
         radius: number;
         offsetX: number;
         centerX: number;
@@ -121,7 +120,6 @@ const { width, height } = Astro.props;
   // UIScrollView's bounce back as reconstructed in super-ultra/ScrollMechanics: mass 1, stiffness 100,
   // critically damped, so a released pull snaps home without overshoot.
   const bounceSpring: Spring = { stiffness: 100, damping: 20 };
-  const stagger = 40;
   const liftDuration = 200;
   const perspective = 640;
   const spinSpeed = (2 * Math.PI) / 48;
@@ -194,6 +192,13 @@ const { width, height } = Astro.props;
     let lastTime = 0;
 
     const topCard = () => cards.find((card) => slotOf(card) === 0);
+    // The front photo isn't on the ring, so the ring spaces the others evenly, in the order their angles give: swapping
+    // angles when a card comes to the front keeps every other card where it was.
+    let ringAngle = new Map<Card, number>();
+    const spaceRing = () => {
+      const ring = cards.filter((card) => slotOf(card) !== 0).sort((a, b) => a.angle - b.angle);
+      ringAngle = new Map(ring.map((card, i) => [card, (2 * Math.PI * (i + 0.5)) / ring.length]));
+    };
     const reach = (radius: number) => ({ x: radius + 72, y: radius * 0.45 + 80 });
 
     const target = (card: Card, now: number): Pose => {
@@ -201,7 +206,8 @@ const { width, height } = Astro.props;
       if (card.liftUntil > now) {
         return { x: card.liftX, y: -12, z: count, rx: 0, ry: 0, rz: Math.sign(card.liftX) * 10, s: 1.04, shade: 0 };
       }
-      if (!orb.open || now < orb.openedAt + slot * stagger) return pilePose(slot, card.rest);
+      // All cards leave the pile in one move: one after another, the photo showing at its edge kept changing.
+      if (!orb.open) return pilePose(slot, card.rest);
 
       const { x: reachX, y: reachY } = reach(orb.radius);
       const nx = clamp((orb.pointerX - orb.centerX) / reachX, -1, 1);
@@ -211,7 +217,7 @@ const { width, height } = Astro.props;
       }
 
       // The pointer turns and tips the ring: near cards follow it, far ones drift the other way.
-      const theta = card.angle + spin + nx * 0.55;
+      const theta = (ringAngle.get(card) ?? card.angle) + spin + nx * 0.55;
       const pitch = 0.24 + ny * 0.14;
       const ringX = orb.radius * Math.sin(theta);
       const ringZ = orb.radius * Math.cos(theta);
@@ -270,6 +276,7 @@ const { width, height } = Astro.props;
       }
 
       let running = orb.open && animate;
+      spaceRing();
       for (const card of cards) {
         const goal = target(card, now);
         const lifting = card.liftUntil > now;
@@ -346,7 +353,6 @@ const { width, height } = Astro.props;
       orb = {
         open: true,
         via,
-        openedAt: performance.now(),
         radius,
         offsetX,
         centerX,

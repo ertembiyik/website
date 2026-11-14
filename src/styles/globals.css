@@ -44,9 +44,9 @@ html {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   /* iPhone Safari otherwise inflates small text it thinks is unreadable, which blew the garland's 4px glyphs up and
-     left its box taller and wider than the flowers drawn into it. */
+     left its box taller and wider than the flowers drawn into it. Safari reads only the prefixed property, and the CSS
+     minifier drops a prefixed declaration that sits beside its unprefixed twin, so it stands alone. */
   -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
 }
 
 body {

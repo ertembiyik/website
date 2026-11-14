@@ -126,7 +126,5 @@ const fontFaces = `
         nameOnly(used ?? links[links.length - 1]);
       });
     </script>
-    {/* Agentation feedback toolbar, dev server only. The module is never referenced by production builds. */}
-    {import.meta.env.DEV && <script is:inline type="module" src="/src/dev/agentation.ts"></script>}
   </body>
 </html>

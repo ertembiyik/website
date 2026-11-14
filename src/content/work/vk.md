@@ -1,7 +1,7 @@
 ---
 title: VK
 role: Senior iOS engineer
-period: Aug 2022 — Nov 2025
+period: Aug 2022 – Nov 2025
 summary: Superapp for 100M+ people. Mini Apps platform, navigation, infra, performance, AI tooling
 links:
   - label: vk.com

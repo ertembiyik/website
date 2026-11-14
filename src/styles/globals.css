@@ -546,8 +546,19 @@ h3 {
   pointer-events: none;
 }
 
+/* A blurred quarter-resolution copy behind the art, so bright petals glow. */
+.garland .garland-bloom {
+  filter: blur(6px) saturate(1.3);
+  opacity: 0.55;
+}
+
 .garland[data-live] pre {
   visibility: hidden;
+}
+
+/* Without the script (reduced motion), the same glow from text shadows. */
+.garland:not([data-live]) pre {
+  text-shadow: 0 0 6px color-mix(in oklab, currentColor 35%, transparent);
 }
 
 /* ---- Detail pages ------------------------------------------------------- */

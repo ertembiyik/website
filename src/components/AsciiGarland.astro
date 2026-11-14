@@ -6,8 +6,9 @@ import artwork from "../assets/garland.svg?raw";
  * The footer garland: the illustration in src/assets/garland.svg turned into coloured characters at
  * build time. Every 8×13 px cell (the 0.6 × 0.975 em proportions of a Geist Mono line) becomes one
  * glyph: an outline stroke on a thin edge, otherwise a density character from coverage and light. Its
- * colour is the cell's average, snapped to a k-means palette of `tones` colours. On hover or touch the
- * script below redraws it on a canvas and lets the flowers sway in a spring-driven wind.
+ * colour is the cell's average, lifted in OKLCH so it glows on the dark page, snapped to a k-means
+ * palette of `tones` colours and written in Display P3. The script below redraws it on a canvas where
+ * the flowers sway in a breeze and the pointer, or a finger, pushes them aside.
  */
 interface Props {
   cols?: number;
@@ -17,12 +18,48 @@ interface Props {
 
 const { cols = 240, rows = 44, tones = 48 } = Astro.props;
 
-type RGB = [number, number, number];
+type Vec3 = [number, number, number];
 
 const cellW = 8;
 const cellH = 13;
 const ramp = " .:-+*ox%#@";
-const luminance = ([r, g, b]: RGB) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+
+// sRGB ↔ OKLab ↔ Display P3, per Björn Ottosson's OKLab and the CSS Color 4 matrices.
+const toLinear = (value: number) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+const toGamma = (value: number) => (value <= 0.0031308 ? 12.92 * value : 1.055 * value ** (1 / 2.4) - 0.055);
+const oklab = ([r, g, b]: Vec3): Vec3 => {
+  const [lr, lg, lb] = [r, g, b].map((value) => toLinear(value / 255)) as Vec3;
+  const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+  const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+  const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+};
+// Linear-light Display P3; inside the gamut when every channel is within 0…1.
+const linearP3 = ([L, a, b]: Vec3): Vec3 => {
+  const l = (L + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (L - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (L - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  const r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  const g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  const bl = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s;
+  return [0.8224621 * r + 0.177538 * g, 0.0331941 * r + 0.9668058 * g, 0.0170827 * r + 0.0723974 * g + 0.9105199 * bl];
+};
+// Lift dark tones and add chroma, then pull chroma back until the colour fits Display P3. Foliage
+// stays a step dimmer so the flowers carry the light.
+const glow = (colour: Vec3): Vec3 => {
+  const [L, a, b] = oklab(colour);
+  const foliage = a < -0.03 && b > 0;
+  const lifted = foliage ? 0.2 + 0.5 * Math.max(0, L) : 0.3 + 0.68 * Math.max(0, L) ** 0.8;
+  for (let chroma = 1.25; chroma > 0; chroma -= 0.05) {
+    const candidate: Vec3 = [lifted, a * chroma, b * chroma];
+    if (linearP3(candidate).every((value) => value >= 0 && value <= 1)) return candidate;
+  }
+  return [lifted, 0, 0];
+};
 
 const { data } = await sharp(Buffer.from(artwork), { density: 144 })
   .resize(cols * cellW, rows * cellH, { fit: "fill" })
@@ -32,7 +69,7 @@ const { data } = await sharp(Buffer.from(artwork), { density: 144 })
 
 const sampleCell = (col: number, row: number) => {
   let alpha = 0;
-  const sum: RGB = [0, 0, 0];
+  const sum: Vec3 = [0, 0, 0];
   const quadrants = [0, 0, 0, 0];
   for (let y = 0; y < cellH; y++) {
     for (let x = 0; x < cellW; x++) {
@@ -49,7 +86,7 @@ const sampleCell = (col: number, row: number) => {
   const coverage = alpha / area;
   if (coverage < 0.1) return undefined;
 
-  const colour: RGB = [sum[0] / alpha, sum[1] / alpha, sum[2] / alpha];
+  const colour: Vec3 = [sum[0] / alpha, sum[1] / alpha, sum[2] / alpha];
   const [tl, tr, bl, br] = quadrants.map((value) => value / (area / 4)) as [number, number, number, number];
   const gx = (tr + br - tl - bl) / 2;
   const gy = (bl + br - tl - tr) / 2;
@@ -58,22 +95,20 @@ const sampleCell = (col: number, row: number) => {
     const sector = Math.round(((Math.atan2(gy, gx) + Math.PI) / Math.PI) * 4) % 8;
     char = sector % 4 === 0 ? "|" : sector % 4 === 2 ? (gy > 0 ? "_" : "-") : sector === 1 || sector === 5 ? "/" : "\\";
   } else {
-    const density = Math.min(1, coverage * (0.18 + 1.05 * luminance(colour)));
+    const light = (0.2126 * colour[0] + 0.7152 * colour[1] + 0.0722 * colour[2]) / 255;
+    const density = Math.min(1, coverage * (0.18 + 1.05 * light));
     char = ramp[Math.max(1, Math.min(ramp.length - 1, Math.round(density * (ramp.length - 1))))]!;
   }
-  // Lift the darkest greens so they still read on the page background.
-  const light = luminance(colour);
-  const lift = light < 0.2 ? 0.2 / Math.max(0.02, light) : 1;
-  return { char, colour: colour.map((value) => Math.min(255, value * lift)) as RGB };
+  return { char, colour: glow(colour) };
 };
 
 const cells = Array.from({ length: rows }, (_, row) => Array.from({ length: cols }, (_, col) => sampleCell(col, row)));
 
-// A deterministic k-means palette over every drawn cell, weighted by how the eye sees each channel.
+// A deterministic k-means palette over every drawn cell, in OKLab so steps are even to the eye.
 const drawn = cells.flat().flatMap((cell) => (cell ? [cell.colour] : []));
-const distance = (a: RGB, b: RGB) => (a[0] - b[0]) ** 2 * 0.3 + (a[1] - b[1]) ** 2 * 0.59 + (a[2] - b[2]) ** 2 * 0.11;
-let palette: RGB[] = Array.from({ length: tones }, (_, i) => drawn[Math.floor((i / tones) * drawn.length)] ?? [0, 0, 0]);
-const nearest = (colour: RGB) => {
+const distance = (a: Vec3, b: Vec3) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+let palette: Vec3[] = Array.from({ length: tones }, (_, i) => drawn[Math.floor((i / tones) * drawn.length)] ?? [0, 0, 0]);
+const nearest = (colour: Vec3) => {
   let best = 0;
   palette.forEach((tone, i) => {
     if (distance(colour, tone) < distance(colour, palette[best]!)) best = i;
@@ -90,13 +125,16 @@ for (let pass = 0; pass < 12; pass++) {
     sum[3]! += 1;
   }
   palette = palette.map((tone, i) => {
-    const [r, g, b, n] = sums[i]!;
-    return n ? [r! / n, g! / n, b! / n] : tone;
+    const [L, a, b, n] = sums[i]!;
+    return n ? [L! / n, a! / n, b! / n] : tone;
   });
 }
 
-const hex = (colour: RGB) => `#${colour.map((value) => Math.round(value).toString(16).padStart(2, "0")).join("")}`;
-const css = palette.map((tone, i) => `.garland .g${i}{color:${hex(tone)}}`).join("");
+const p3 = (tone: Vec3) =>
+  `color(display-p3 ${linearP3(tone).map((value) => toGamma(Math.min(1, Math.max(0, value))).toFixed(4)).join(" ")})`;
+const css = palette.map((tone, i) => `.garland .g${i}{color:${p3(tone)}}`).join("");
+// OKLab per tone for the script, which finds flowers by colour: [L, a, b].
+const toneData = JSON.stringify(palette.map((tone) => tone.map((value) => Number(value.toFixed(3)))));
 
 const art = cells
   .map((line) => {
@@ -115,7 +153,7 @@ const art = cells
   .join("\n");
 ---
 
-<div class="garland" aria-hidden="true" data-garland>
+<div class="garland" aria-hidden="true" data-garland data-tones={toneData}>
   <div class="garland-art">
     <pre style={{ "--cols": cols }} set:html={art} />
   </div>
@@ -123,68 +161,217 @@ const art = cells
 <style is:inline set:html={css} />
 
 <script>
-  type Glyph = { char: string; col: number; row: number };
+  type Lab = [number, number, number];
+  type Glyph = { char: string; col: number; row: number; plant: number; give: number; shown: boolean };
+  type Hand = { col: number; row: number };
+  type Plant = {
+    foliage: boolean;
+    /** Top row of the plant, and the lowest row of its flower head (equal to `crown` for foliage). */
+    crown: number;
+    head: number;
+    centre: number;
+    /** Occupied columns per row at rest, for where the hand meets the plant. */
+    extent: Map<number, [number, number]>;
+    omega: number;
+    bend: number;
+    velocity: number;
+    /** Side the hand pushes from (1: from the left), 0 when untouched. */
+    side: number;
+    slipping: boolean;
+  };
 
-  // Column springs range between these periods, changing slowly across the bed: a bloom's columns
-  // share a period and sway as one, while flowers further apart fall out of phase.
-  const periods = [0.95, 1.3];
-  const bounce = 0.3;
-  const coupling = 40;
-  const reach = 18;
-  const maxBend = 3.5;
-  const pad = 6;
+  // Plants spring toward the wave field with periods in this range, so neighbours fall out of phase.
+  const periods = [1.1, 1.6];
+  const bounce = 0.35;
+  // The wave field across the bed: how fast a disturbance travels (columns a second), how quickly
+  // it fades, and how firmly it settles back to the wind.
+  const waveSpeed = 55;
+  const waveDamping = 1.6;
+  const waveSettle = 6;
+  // The hand's reach past its point in columns, and how firmly it presses a plant it touches.
+  const handRadius = 1.4;
+  const contact = 700;
+  // How far (columns) a flower head is pushed before it slips off the hand.
+  const maxBend = 5;
+  // A gust rolls across the bed for `gustRun` seconds out of every `gustCycle`.
+  const gustCycle = 8;
+  const gustRun = 3;
+  const pad = 8;
+
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
   function bindGarland(signal: AbortSignal) {
     const host = document.querySelector<HTMLElement>("[data-garland]");
     const box = host?.querySelector<HTMLElement>(".garland-art");
     const pre = box?.querySelector("pre");
     if (!host || !box || !pre || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const tones: Lab[] = JSON.parse(host.dataset.tones ?? "[]");
 
-    // Read the glyphs back out of the static art, grouped by colour.
-    const groups = new Map<string, Glyph[]>();
-    const toneOf = new Map<string, string>();
+    // Read the glyphs back out of the static art.
+    const read: { char: string; col: number; row: number; tone: number; colour: string }[] = [];
+    const colourOf = new Map<string, string>();
     let row = 0;
     let col = 0;
     let cols = 0;
     for (const node of Array.from(pre.childNodes)) {
-      const text = node.textContent ?? "";
       let colour: string | undefined;
+      let tone = -1;
       if (node instanceof HTMLElement) {
-        colour = toneOf.get(node.className) ?? getComputedStyle(node).color;
-        toneOf.set(node.className, colour);
+        colour = colourOf.get(node.className) ?? getComputedStyle(node).color;
+        colourOf.set(node.className, colour);
+        tone = Number(node.className.slice(1));
       }
-      for (const char of text) {
+      for (const char of node.textContent ?? "") {
         if (char === "\n") {
           row += 1;
           col = 0;
           continue;
         }
-        if (colour && char !== " ") {
-          const list = groups.get(colour) ?? [];
-          list.push({ char, col, row });
-          groups.set(colour, list);
-        }
+        if (colour && char !== " ") read.push({ char, col, row, tone, colour });
         col += 1;
         cols = Math.max(cols, col);
       }
     }
     const rows = row + 1;
+    const ground = rows - 1;
+
+    // Find the flowers: connected patches of similar, non-green glyphs. A patch whose bounds sit mostly
+    // inside a bigger one's (a flower's centre) joins it. Every column goes to the flower filling most
+    // of it, so a flower and its stem move as one; columns with no flower form short foliage plants.
+    const green = (tone: number) => {
+      const [, a = 0, b = 0] = tones[tone] ?? [];
+      return a < -0.03 && b > -0.02;
+    };
+    // Same flower: the same hue (petal outlines are darker but share it), or both near-white.
+    const near = (x: number, y: number) => {
+      const [l1 = 0, a1 = 0, b1 = 0] = tones[x] ?? [];
+      const [l2 = 0, a2 = 0, b2 = 0] = tones[y] ?? [];
+      if (Math.hypot(a1, b1) < 0.025 || Math.hypot(a2, b2) < 0.025) return Math.abs(l1 - l2) < 0.35;
+      const turn = Math.abs(Math.atan2(b1, a1) - Math.atan2(b2, a2));
+      return Math.min(turn, 2 * Math.PI - turn) < 0.6;
+    };
+    const grid = new Map<number, number>();
+    for (const glyph of read) if (!green(glyph.tone)) grid.set(glyph.row * cols + glyph.col, glyph.tone);
+    const patchOf = new Map<number, number>();
+    const sizes: number[] = [];
+    const bounds: number[][] = [];
+    for (const [start, tone] of grid) {
+      if (patchOf.has(start)) continue;
+      const id = sizes.length;
+      const queue = [start];
+      const box = [Infinity, Infinity, -Infinity, -Infinity];
+      patchOf.set(start, id);
+      let size = 0;
+      while (queue.length) {
+        const cell = queue.pop()!;
+        const r = Math.floor(cell / cols);
+        const c = cell % cols;
+        size += 1;
+        box.splice(0, 4, Math.min(box[0]!, r), Math.min(box[1]!, c), Math.max(box[2]!, r), Math.max(box[3]!, c));
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const next = (r + dr) * cols + c + dc;
+            const other = grid.get(next);
+            if (other === undefined || patchOf.has(next) || c + dc < 0 || c + dc >= cols || !near(tone, other)) continue;
+            patchOf.set(next, id);
+            queue.push(next);
+          }
+        }
+      }
+      sizes.push(size);
+      bounds.push(box);
+    }
+    const area = ([r0 = 0, c0 = 0, r1 = 0, c1 = 0]: number[]) => Math.max(0, r1 - r0 + 1) * Math.max(0, c1 - c0 + 1);
+    const parent = sizes.map((_, id) => id);
+    const rootOf = (id: number): number => (parent[id] === id ? id : (parent[id] = rootOf(parent[id]!)));
+    sizes.forEach((size, id) => {
+      const inner = bounds[id]!;
+      const host = sizes.findIndex((other, j) => {
+        if (j === id || other <= size) return false;
+        const outer = bounds[j]!;
+        const overlap = [Math.max(inner[0]!, outer[0]!), Math.max(inner[1]!, outer[1]!), Math.min(inner[2]!, outer[2]!), Math.min(inner[3]!, outer[3]!)];
+        return area(overlap) >= area(inner) * 0.7;
+      });
+      if (host >= 0) parent[id] = host;
+    });
+    const total = sizes.map(() => 0);
+    sizes.forEach((size, id) => (total[rootOf(id)]! += size));
+    const flowerAt = (cell: number) => {
+      const id = patchOf.get(cell);
+      return id === undefined || total[rootOf(id)]! < 8 ? -1 : rootOf(id);
+    };
+
+    const indexOf = new Map<string, number>();
+    const plantFor = (key: string) => indexOf.get(key) ?? indexOf.set(key, indexOf.size).get(key)!;
+    let foliage = 0;
+    const plantOf = Int16Array.from({ length: cols }, (_, c) => {
+      const counts = new Map<number, number>();
+      for (let r = 0; r < rows; r++) {
+        const id = flowerAt(r * cols + c);
+        if (id >= 0) counts.set(id, (counts.get(id) ?? 0) + 1);
+      }
+      const id = [...counts].sort((x, y) => y[1] - x[1])[0]?.[0];
+      if (id !== undefined) return plantFor(`flower-${id}`);
+      if (c === 0 || flowerAt(c - 1) >= 0 || c - foliage >= 10) foliage = c;
+      return plantFor(`leaf-${foliage}`);
+    });
+    const owner = read.map((glyph) => {
+      const id = flowerAt(glyph.row * cols + glyph.col);
+      return id >= 0 ? plantFor(`flower-${id}`) : plantOf[glyph.col]!;
+    });
+    const keys = [...indexOf.keys()];
+    const plants: Plant[] = Array.from({ length: indexOf.size }, (_, index) => {
+      const mine = read.filter((_, i) => owner[i] === index);
+      const petals = mine.filter((glyph) => flowerAt(glyph.row * cols + glyph.col) >= 0);
+      const crown = Math.min(ground, ...mine.map((glyph) => glyph.row));
+      return {
+        foliage: keys[index]!.startsWith("leaf"),
+        crown,
+        head: petals.length ? Math.max(...petals.map((glyph) => glyph.row)) : crown,
+        centre: mine.reduce((sum, glyph) => sum + glyph.col, 0) / Math.max(1, mine.length),
+        extent: new Map(),
+        omega: (2 * Math.PI) / (periods[0]! + (periods[1]! - periods[0]!) * (0.5 + 0.5 * Math.sin(index * 2.3))),
+        bend: 0,
+        velocity: 0,
+        side: 0,
+        slipping: false,
+      };
+    });
+    // How much of the head's movement a row takes: the flower head moves as one piece with a slight
+    // tilt, and the stem below it bends down to the root.
+    const giveAt = (plant: Plant, at: number) => {
+      if (at <= plant.head) return 1 + 0.12 * ((plant.crown + plant.head) / 2 - at) / Math.max(1, plant.head - plant.crown);
+      return Math.pow(clamp((ground - at) / Math.max(3, ground - plant.head), 0, 1), 1.4);
+    };
+
+    const groups = new Map<string, Glyph[]>();
+    read.forEach(({ colour, char, col, row }, i) => {
+      const glyph = { char, col, row };
+      const index = owner[i]!;
+      const plant = plants[index]!;
+      const [left, right] = plant.extent.get(glyph.row) ?? [glyph.col, glyph.col];
+      plant.extent.set(glyph.row, [Math.min(left, glyph.col), Math.max(right, glyph.col)]);
+      const list = groups.get(colour) ?? [];
+      list.push({ ...glyph, plant: index, give: giveAt(plant, glyph.row), shown: true });
+      groups.set(colour, list);
+    });
+    // Front to back: smaller flowers, then bigger ones, then foliage. Each frame a cell shows only the
+    // frontmost glyph that lands in it, so flowers moving past each other occlude instead of smearing.
+    const size = plants.map((_, index) => owner.filter((value) => value === index).length);
+    const depth = (plant: number) => (plants[plant]!.foliage ? 1e6 : 0) + size[plant]!;
+    const ordered = [...groups.values()].flat().sort((a, b) => depth(a.plant) - depth(b.plant));
+    const taken = new Uint8Array(rows * (cols + pad * 2));
 
     const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    box.append(canvas);
-
-    const bend = new Float32Array(cols);
-    const velocity = new Float32Array(cols);
-    const omega = Float32Array.from({ length: cols }, (_, i) => {
-      const period = periods[0]! + (periods[1]! - periods[0]!) * (0.5 + 0.5 * Math.sin(i * 0.07));
-      return (2 * Math.PI) / period;
-    });
-    // Rooted at the ground: the top of the art sways the most.
-    const sway = Float32Array.from({ length: rows }, (_, r) => Math.pow(1 - r / rows, 1.6));
+    const bloom = document.createElement("canvas");
+    bloom.className = "garland-bloom";
+    const context = canvas.getContext("2d", { colorSpace: "display-p3" });
+    const glowContext = bloom.getContext("2d", { colorSpace: "display-p3" });
+    if (!context || !glowContext) return;
+    box.append(bloom, canvas);
 
     let metrics = { advance: 0, line: 0, baseline: 0 };
+    let frames = 0;
     const measure = () => {
       const style = getComputedStyle(pre);
       const size = parseFloat(style.fontSize);
@@ -197,9 +384,14 @@ const art = cells
       metrics = { advance: probe.width, line, baseline };
       const width = (cols + pad * 2) * probe.width;
       const height = rows * line;
+      const placement = `left:${-pad * probe.width}px;top:0;width:${width}px;height:${height}px`;
       canvas.width = Math.round(width * ratio);
       canvas.height = Math.round(height * ratio);
-      canvas.style.cssText = `left:${-pad * probe.width}px;top:0;width:${width}px;height:${height}px`;
+      canvas.style.cssText = placement;
+      // The glow only needs a quarter of the resolution; CSS blurs it.
+      bloom.width = Math.round(width / 4);
+      bloom.height = Math.round(height / 4);
+      bloom.style.cssText = placement;
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
       context.font = font;
       context.textBaseline = "alphabetic";
@@ -213,87 +405,169 @@ const art = cells
       const boxRect = box.getBoundingClientRect();
       const first = Math.floor((hostRect.left - boxRect.left) / advance) - pad;
       const last = Math.ceil((hostRect.right - boxRect.left) / advance) + pad;
-      for (const [colour, glyphs] of groups) {
+      taken.fill(0);
+      for (const glyph of ordered) {
+        const cell = glyph.row * (cols + pad * 2) + Math.round(glyph.col + pad + plants[glyph.plant]!.bend * glyph.give);
+        glyph.shown = !taken[cell];
+        taken[cell] = 1;
+      }
+      for (const [colour, list] of groups) {
         context.fillStyle = colour;
-        for (const { char, col, row } of glyphs) {
-          if (col < first || col > last) continue;
-          context.fillText(char, (col + pad + bend[col]! * sway[row]!) * advance, row * line + baseline);
+        for (const { char, col, row, plant, give, shown } of list) {
+          if (!shown || col < first || col > last) continue;
+          const { bend } = plants[plant]!;
+          // A pushed head swings on an arc, dipping a little as it leans.
+          context.fillText(char, (col + pad + bend * give) * advance, (row + bend * bend * 0.015 * give) * line + baseline);
         }
+      }
+      // The glow is blurred anyway; refreshing it every third frame is plenty.
+      if (frames++ % 3 === 0) {
+        glowContext.clearRect(0, 0, bloom.width, bloom.height);
+        glowContext.drawImage(canvas, 0, 0, bloom.width, bloom.height);
       }
     };
 
-    let breeze = 0;
-    let inside = false;
+    // The field the flowers lean into: a slow sway plus a gust rolling across, which the hand disturbs.
+    const field = new Float32Array(cols);
+    const fieldVelocity = new Float32Array(cols);
+    const wind = (at: number, t: number) => {
+      const sway = 0.4 * Math.sin(t * 0.8 + at * 0.045) + 0.2 * Math.sin(t * 1.9 + at * 0.11 + 1.3);
+      const run = (t % gustCycle) / gustRun;
+      if (run > 1) return sway;
+      const front = -30 + run * (cols + 60);
+      return sway + 1.4 * Math.sin(Math.PI * run) * Math.exp(-(((at - front) / 18) ** 2));
+    };
+    const fieldAt = (at: number) => {
+      const i = clamp(Math.floor(at), 0, cols - 2);
+      const t = clamp(at - i, 0, 1);
+      return field[i]! * (1 - t) + field[i + 1]! * t;
+    };
+    const kick = (at: number, speed: (offset: number) => number, reach = 7) => {
+      for (let i = Math.max(0, Math.floor(at - reach)); i < Math.min(cols, at + reach); i++) {
+        const falloff = 1 - Math.abs(i - at) / reach;
+        fieldVelocity[i]! += speed(i - at) * falloff * falloff;
+      }
+    };
+
+    let hand: Hand | undefined;
+
+    // The hand presses on a plant's edge at the height it touches; it can push but never pull.
+    const press = (plant: Plant) => {
+      const reach = hand ? plant.extent.get(Math.round(hand.row)) : undefined;
+      const give = hand ? giveAt(plant, hand.row) : 0;
+      if (!hand || !reach || give < 0.05) {
+        plant.side = 0;
+        plant.slipping = false;
+        return 0;
+      }
+      const left = reach[0] + plant.bend * give;
+      const right = reach[1] + 1 + plant.bend * give;
+      if (hand.col < left - handRadius - 1 || hand.col > right + handRadius + 1) {
+        plant.side = 0;
+        plant.slipping = false;
+        return 0;
+      }
+      if (plant.slipping || hand.col < left - handRadius || hand.col > right + handRadius) return 0;
+      plant.side ||= hand.col < (left + right) / 2 ? 1 : -1;
+      const goal = plant.side > 0 ? (hand.col + handRadius - reach[0]) / give : (hand.col - handRadius - reach[1] - 1) / give;
+      if (Math.abs(goal) > maxBend) {
+        plant.slipping = true;
+        return 0;
+      }
+      if ((plant.side > 0 && goal <= plant.bend) || (plant.side < 0 && goal >= plant.bend)) return 0;
+      return contact * (goal - plant.bend) - 2 * 0.7 * Math.sqrt(contact) * plant.velocity;
+    };
+
+    const step = (t: number, h: number) => {
+      for (let i = 0; i < cols; i++) {
+        const laplacian = (field[i - 1] ?? field[i]!) + (field[i + 1] ?? field[i]!) - 2 * field[i]!;
+        fieldVelocity[i]! +=
+          (waveSpeed * waveSpeed * laplacian - waveDamping * fieldVelocity[i]! - waveSettle * (field[i]! - wind(i, t))) * h;
+      }
+      for (let i = 0; i < cols; i++) field[i]! += fieldVelocity[i]! * h;
+
+      for (const plant of plants) {
+        const w = plant.omega;
+        const pushed = press(plant);
+        const force = -w * w * (plant.bend - fieldAt(plant.centre)) - 2 * (1 - bounce) * w * plant.velocity + pushed;
+        plant.velocity += force * h;
+        plant.bend = clamp(plant.bend + plant.velocity * h, -maxBend * 1.3, maxBend * 1.3);
+        // A pushed flower nudges the field, so the push travels on to its neighbours.
+        if (pushed) kick(plant.centre, () => pushed * h * 0.04, 5);
+      }
+    };
+
+    let visible = false;
     let frame = 0;
     let lastTime = 0;
-    let pointer = { x: 0, time: 0 };
+    let lastDraw = 0;
 
     const tick = (now: number) => {
       frame = 0;
-      const dt = Math.min((now - lastTime) / 1000, 1 / 30);
+      if (!visible) return;
+      // Untouched, the breeze only needs 30 frames a second.
+      if (!hand && now - lastDraw < 30) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
+      const dt = Math.min((now - lastTime) / 1000, 1 / 20);
       lastTime = now;
-      breeze += ((inside ? 1 : 0) - breeze) * (1 - Math.exp(-dt * 3));
-      const t = now / 1000;
-      let moving = inside || breeze > 0.01;
-      for (let i = 0; i < cols; i++) {
-        const w = omega[i]!;
-        const wind = breeze * 0.9 * Math.sin(t * 1.7 + i * 0.09) * Math.sin(t * 0.6 + i * 0.023);
-        const left = bend[i - 1] ?? bend[i]!;
-        const right = bend[i + 1] ?? bend[i]!;
-        const force =
-          -w * w * (bend[i]! - wind) - 2 * (1 - bounce) * w * velocity[i]! + coupling * (left + right - 2 * bend[i]!);
-        velocity[i]! += force * dt;
-        bend[i] = Math.max(-maxBend, Math.min(maxBend, bend[i]! + velocity[i]! * dt));
-        if (Math.abs(bend[i]!) > 0.002 || Math.abs(velocity[i]!) > 0.002) moving = true;
-      }
-      if (!moving) {
-        bend.fill(0);
-        velocity.fill(0);
-      }
+      lastDraw = now;
+      const substeps = Math.ceil(dt * 120);
+      for (let s = 0; s < substeps; s++) step(now / 1000, dt / substeps);
       draw();
-      if (moving) frame = requestAnimationFrame(tick);
+      frame = requestAnimationFrame(tick);
     };
     const wake = () => {
-      if (frame) return;
+      if (frame || !visible) return;
       lastTime = performance.now();
       frame = requestAnimationFrame(tick);
     };
 
-    // Columns near `clientX` pick up `speed` (cells per second), fading with distance.
-    const push = (clientX: number, speed: (offset: number) => number) => {
-      const centre = (clientX - box.getBoundingClientRect().left) / metrics.advance;
-      for (let i = Math.max(0, Math.floor(centre - reach)); i < Math.min(cols, centre + reach); i++) {
-        const falloff = 1 - Math.abs(i - centre) / reach;
-        velocity[i]! += speed(i - centre) * falloff * falloff;
-      }
+    let last = { col: 0, time: 0 };
+    const place = (event: PointerEvent) => {
+      const rect = box.getBoundingClientRect();
+      hand = { col: (event.clientX - rect.left) / metrics.advance, row: (event.clientY - rect.top) / metrics.line };
+      // Moving through the bed stirs the field along the way.
+      const elapsed = Math.max(8, event.timeStamp - last.time);
+      const speed = ((hand.col - last.col) / elapsed) * 1000;
+      if (last.time && hand.row > 0) kick(hand.col, () => clamp(speed, -50, 50) * 0.12);
+      last = { col: hand.col, time: event.timeStamp };
       wake();
     };
-
-    host.addEventListener("pointerenter", () => {
-      inside = true;
-      wake();
-    });
-    host.addEventListener("pointerleave", () => {
-      inside = false;
-    });
     host.addEventListener("pointermove", (event) => {
-      const elapsed = Math.max(8, event.timeStamp - pointer.time);
-      const speed = ((event.clientX - pointer.x) / metrics.advance / elapsed) * 1000;
-      if (pointer.time) push(event.clientX, () => Math.max(-60, Math.min(60, speed)) * 0.35);
-      pointer = { x: event.clientX, time: event.timeStamp };
+      if (event.pointerType === "mouse" || hand) place(event);
     });
-    // A tap parts the flowers either side of the finger.
     host.addEventListener("pointerdown", (event) => {
-      if (event.pointerType !== "mouse") push(event.clientX, (offset) => Math.sign(offset) * 9);
+      if (event.pointerType === "mouse") return;
+      last = { col: 0, time: 0 };
+      place(event);
+      // A tap sends a ripple out from the finger.
+      if (hand) kick(hand.col, (offset) => Math.sign(offset) * 10, 10);
     });
+    const release = (event: PointerEvent) => {
+      if (event.pointerType !== "mouse" || event.type === "pointerleave") {
+        hand = undefined;
+        last = { col: 0, time: 0 };
+      }
+    };
+    host.addEventListener("pointerup", release);
+    host.addEventListener("pointercancel", release);
+    host.addEventListener("pointerleave", release);
 
     const resize = new ResizeObserver(() => {
       measure();
       draw();
     });
     resize.observe(box);
+    const watch = new IntersectionObserver(([entry]) => {
+      visible = !!entry?.isIntersecting;
+      wake();
+    });
+    watch.observe(host);
     signal.addEventListener("abort", () => {
       resize.disconnect();
+      watch.disconnect();
       cancelAnimationFrame(frame);
     });
 

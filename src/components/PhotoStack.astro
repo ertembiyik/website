@@ -154,11 +154,13 @@ const { width, height } = Astro.props;
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
     const finePointer = matchMedia("(hover: hover) and (pointer: fine)");
     const count = elements.length;
-    // A swiped card follows the finger 1:1 for a quarter of its width, then stretches on UIScrollView's rubber band.
+    // A swiped card follows the finger 1:1 for a quarter of its width, then stretches on UIScrollView's rubber band,
+    // reckoned against the card's own width so it never travels much more than one card.
+    const freeDrag = () => pile.offsetWidth / 4;
     const follow = (drag: number): [offset: number, slope: number] => {
-      const free = pile.offsetWidth / 4;
+      const free = freeDrag();
       if (Math.abs(drag) <= free) return [drag, 1];
-      const [extra, slope] = rubberBand(drag - Math.sign(drag) * free, innerWidth);
+      const [extra, slope] = rubberBand(drag - Math.sign(drag) * free, pile.offsetWidth * 0.9);
       return [Math.sign(drag) * free + extra, slope];
     };
 
@@ -436,11 +438,11 @@ const { width, height } = Astro.props;
         const [x, slope] = follow(ended.grabX + ended.lastX - ended.startX);
         card.held = false;
         card.velocity = { ...zeroPose(), x: velocity * 1000 * slope, rz: velocity * 80 * slope };
-        // A stretch springs home however far it went; only a flick outward, one that would coast on past most of the
-        // card's width, throws the card to the back.
-        const coast = project(velocity * slope);
-        if (!cancelled && Math.abs(coast) > pile.offsetWidth * 0.6 && Math.sign(coast) === Math.sign(x)) {
-          shuffle(coast < 0 ? -1 : 1, x + coast);
+        // Let go in the stretch, or flicked so it would coast into it, the card goes to the back; a small drag that stays
+        // in the free stretch, or one pulled back toward the middle, springs home.
+        const landing = x + project(velocity * slope);
+        if (!cancelled && Math.abs(landing) > freeDrag() && Math.sign(landing) === Math.sign(x || landing)) {
+          shuffle(landing < 0 ? -1 : 1, landing);
         } else {
           card.spring = bounceSpring;
         }

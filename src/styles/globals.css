@@ -501,7 +501,6 @@ h3 {
   flex-direction: column;
   gap: 1.25rem;
   padding-top: 2rem;
-  border-top: var(--hairline) solid var(--line);
 }
 
 .site-footer .label {
@@ -527,7 +526,7 @@ h3 {
   justify-content: center;
   width: 100vw;
   margin-inline: calc(50% - 50vw);
-  /* The meadow's ground rests on the footer's hairline. */
+  /* The meadow's ground runs straight into the footer. */
   margin-bottom: -3.5rem;
   overflow-x: clip;
   container-type: inline-size;

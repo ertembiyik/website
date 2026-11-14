@@ -169,7 +169,9 @@ const art = cells
   /** OKLab (to find flowers by colour) and the Display P3 colour a tone draws with. */
   type Tone = [number, number, number, number, number, number];
   type Cell = { char: string; col: number; row: number; tone: number };
-  type Hand = { col: number; row: number };
+  type Spot = { col: number; row: number };
+  /** Where the pointer or finger is in the art, and how fast it moves sideways (columns a second). */
+  type Hand = Spot & { speed: number };
   type Plant = {
     cells: Cell[];
     /** Top row of the plant, and the lowest row of its flower head. */
@@ -185,7 +187,7 @@ const art = cells
     side: number;
     slipping: boolean;
   };
-  type Bee = { col: number; row: number; vc: number; vr: number; target: number; until: number; phase: number; trail: Hand[]; dropped: number };
+  type Bee = { col: number; row: number; vc: number; vr: number; target: number; until: number; phase: number; trail: Spot[]; dropped: number };
 
   // Plants spring toward the wave field with periods in this range; it drifts slowly across the bed
   // so neighbours move together instead of tearing apart.
@@ -196,9 +198,8 @@ const art = cells
   const waveSpeed = 55;
   const waveDamping = 1.6;
   const waveSettle = 6;
-  // The hand's reach past its point in columns, and how firmly it presses a plant it touches.
+  // The hand's reach past its point, in columns.
   const handRadius = 1.4;
-  const contact = 700;
   // How far (columns) a flower head is pushed before it slips off the hand.
   const maxBend = 5;
   // A gust rolls across the bed for `gustRun` seconds out of every `gustCycle`.
@@ -674,7 +675,7 @@ const art = cells
     const placeBees = (t: number) => {
       beeData.fill(0);
       let slot = 0;
-      const put = (char: string, at: Hand, [r, g, b]: [number, number, number], alpha: number) => {
+      const put = (char: string, at: Spot, [r, g, b]: [number, number, number], alpha: number) => {
         beeData.set([at.col, at.row, glyphIndex.get(char) ?? 0, r, g, b, -2, 0, 0, alpha], slot++ * stride);
       };
       for (const bee of bees) {
@@ -744,31 +745,32 @@ const art = cells
       gl.bindVertexArray(null);
     };
 
-    // The hand presses on a plant's edge at the height it touches; it can push but never pull.
+    // Where the hand holds a plant this step, if it is pressing on it: at the height it touches, the
+    // plant's edge sits right at the hand. It can push but never pull.
     const press = (plant: Plant) => {
       const reach = hand ? plant.extent.get(Math.round(hand.row)) : undefined;
       const give = hand ? giveAt(plant, hand.row) : 0;
       if (!hand || !reach || give < 0.05) {
         plant.side = 0;
         plant.slipping = false;
-        return 0;
+        return undefined;
       }
       const left = reach[0] + plant.bend * give;
       const right = reach[1] + 1 + plant.bend * give;
       if (hand.col < left - handRadius - 1 || hand.col > right + handRadius + 1) {
         plant.side = 0;
         plant.slipping = false;
-        return 0;
+        return undefined;
       }
-      if (plant.slipping || hand.col < left - handRadius || hand.col > right + handRadius) return 0;
+      if (plant.slipping || hand.col < left - handRadius || hand.col > right + handRadius) return undefined;
       plant.side ||= hand.col < (left + right) / 2 ? 1 : -1;
       const goal = plant.side > 0 ? (hand.col + handRadius - reach[0]) / give : (hand.col - handRadius - reach[1] - 1) / give;
       if (Math.abs(goal) > maxBend) {
         plant.slipping = true;
-        return 0;
+        return undefined;
       }
-      if ((plant.side > 0 && goal <= plant.bend) || (plant.side < 0 && goal >= plant.bend)) return 0;
-      return contact * (goal - plant.bend) - 2 * 0.7 * Math.sqrt(contact) * plant.velocity;
+      const pushing = plant.side > 0 ? goal > plant.bend : goal < plant.bend;
+      return pushing ? { goal, give } : undefined;
     };
 
     const step = (t: number, h: number) => {
@@ -781,12 +783,18 @@ const art = cells
 
       for (const plant of plants) {
         const w = plant.omega;
-        const pushed = press(plant);
-        const force = -w * w * (plant.bend - fieldAt(plant.centre)) - 2 * (1 - bounce) * w * plant.velocity + pushed;
+        const force = -w * w * (plant.bend - fieldAt(plant.centre)) - 2 * (1 - bounce) * w * plant.velocity;
         plant.velocity += force * h;
         plant.bend = clamp(plant.bend + plant.velocity * h, -maxBend * 1.3, maxBend * 1.3);
-        // A pushed flower nudges the field, so the push travels on to its neighbours.
-        if (pushed) kick(plant.centre, () => pushed * h * 0.04, 5);
+        // Contact is a constraint, not a spring: a pressed plant's edge is placed at the hand and moves at
+        // its speed, so nothing trails behind it. Slip off or let go and it keeps that speed, springing back.
+        const held = press(plant);
+        if (held && hand) {
+          plant.bend = held.goal;
+          plant.velocity = Math.max(0, (hand.speed / held.give) * plant.side) * plant.side;
+          // The push travels on through the field to the neighbours.
+          kick(plant.centre, () => hand!.speed * 0.01, 5);
+        }
       }
       fly(t, h);
     };
@@ -809,6 +817,8 @@ const art = cells
       const dt = Math.min((now - lastTime) / 1000, 1 / 20);
       lastTime = now;
       const t = now / 1000;
+      // A hand that stops moving stops pushing things along.
+      if (hand) hand.speed *= Math.exp(-dt * 10);
       const resting = !hand && now - lastActivity > restAfter;
       lively += ((resting ? 0 : 1) - lively) * (1 - Math.exp(-dt * 1.5));
       // The wind for this frame, once per column rather than once per physics step.
@@ -842,10 +852,10 @@ const art = cells
       const rect = box.getBoundingClientRect();
       const col = (event.clientX - rect.left) / metrics.advance;
       // The art repeats, so the hand acts on the matching column of the one painting.
-      hand = { col: wrap(col, cols), row: (event.clientY - rect.top) / metrics.line };
-      // Moving through the bed stirs the field along the way.
       const elapsed = Math.max(8, event.timeStamp - last.time);
-      const speed = ((col - last.col) / elapsed) * 1000;
+      const speed = last.time ? clamp(((col - last.col) / elapsed) * 1000, -120, 120) : 0;
+      hand = { col: wrap(col, cols), row: (event.clientY - rect.top) / metrics.line, speed: hand ? 0.6 * speed + 0.4 * hand.speed : speed };
+      // Moving through the bed stirs the field along the way.
       if (last.time && hand.row > 0) kick(hand.col, () => clamp(speed, -50, 50) * 0.12);
       last = { col, time: event.timeStamp };
       wake();

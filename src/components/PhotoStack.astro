@@ -4,8 +4,9 @@ import type { ImageMetadata } from "astro";
 
 /**
  * A pile of photos and clips. Drop files into src/assets/me/ (jpg, png, webp, mp4, webm);
- * they are sorted by filename, so prefix them to control order. Hover fans the pile out,
- * a click sends the top card to the back.
+ * they are sorted by filename, so prefix them to control order. Hovering with a mouse opens
+ * the pile into an orb around the top photo that follows the pointer; a click on a card in
+ * the orb brings it to the front, a click on the top card sends it to the back.
  */
 const images = import.meta.glob<{ default: ImageMetadata }>("../assets/me/*.{jpg,jpeg,png,webp}", {
   eager: true,
@@ -53,38 +54,293 @@ const { width, height } = Astro.props;
         ) : (
           <video src={card.src} autoplay muted loop playsinline aria-hidden="true" />
         )}
+        <span class="pile-shade" />
       </figure>
     ))
   }
 </div>
 
 <script>
-  function bindPile() {
+  type Pose = { x: number; y: number; z: number; rx: number; ry: number; rz: number; s: number; shade: number };
+
+  const poseKeys = ["x", "y", "z", "rx", "ry", "rz", "s", "shade"] as const satisfies readonly (keyof Pose)[];
+
+  interface Card {
+    el: HTMLElement;
+    shade: HTMLElement;
+    /** Fixed place on the ring, so a reorder only moves the cards that change role. */
+    angle: number;
+    tilt: number;
+    drift: number;
+    /** Resting rotation from the pile's CSS (`--r` for the card's slot). */
+    rest: number;
+    liftUntil: number;
+    pose: Pose;
+    velocity: Pose;
+  }
+
+  type Orb =
+    | { open: false }
+    | { open: true; openedAt: number; radius: number; centerX: number; centerY: number; pointerX: number; pointerY: number };
+
+  // Apple-style spring (duration 0.5s, bounce 0.2) as stiffness and damping for unit mass.
+  const omega = (2 * Math.PI) / 0.5;
+  const stiffness = omega ** 2;
+  const damping = 2 * (1 - 0.2) * omega;
+
+  const stagger = 40;
+  const liftDuration = 200;
+  const perspective = 640;
+  const spinSpeed = (2 * Math.PI) / 48;
+  const tilts = [-6, 5, -3, 7, -5, 4];
+  const drifts = [-14, 10, -6, 16, -12, 8];
+
+  const zeroPose = (): Pose => ({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, s: 0, shade: 0 });
+  const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+  function bindPile(signal: AbortSignal) {
     const pile = document.querySelector<HTMLElement>("[data-pile]");
-    const cards = pile ? Array.from(pile.querySelectorAll<HTMLElement>(".pile-card")) : [];
-    if (!pile || cards.length < 2) return;
+    const elements = pile ? Array.from(pile.querySelectorAll<HTMLElement>(".pile-card")) : [];
+    if (!pile || elements.length < 2) return;
+
+    const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+    const finePointer = matchMedia("(hover: hover) and (pointer: fine)");
+    const count = elements.length;
+
+    const slotOf = (card: Card) => Number(card.el.dataset.i);
+    const restOf = (el: HTMLElement) => parseFloat(getComputedStyle(el).getPropertyValue("--r")) || 0;
+    const pilePose = (slot: number, rest: number): Pose => ({
+      x: slot * 3,
+      y: slot * -3,
+      z: -slot,
+      rx: 0,
+      ry: 0,
+      rz: rest,
+      s: 1,
+      shade: 0,
+    });
+
+    const cards: Card[] = elements.flatMap((el, index) => {
+      const shade = el.querySelector<HTMLElement>(".pile-shade");
+      if (!shade) return [];
+      const rest = restOf(el);
+      return {
+        el,
+        shade,
+        angle: (2 * Math.PI * index) / count + Math.PI / count,
+        tilt: tilts[index % tilts.length],
+        drift: drifts[index % drifts.length],
+        rest,
+        liftUntil: 0,
+        pose: pilePose(Number(el.dataset.i), rest),
+        velocity: zeroPose(),
+      };
+    });
+
+    let orb: Orb = { open: false };
+    let hovered: Card | undefined;
+    let spin = 0;
+    let spinRate = 0;
+    let frame = 0;
+    let lastTime = 0;
+
+    const reach = (radius: number) => ({ x: radius + 72, y: radius * 0.45 + 80 });
+
+    const target = (card: Card, now: number): Pose => {
+      const slot = slotOf(card);
+      if (card.liftUntil > now) return { x: 52, y: -12, z: count, rx: 0, ry: 0, rz: 10, s: 1.04, shade: 0 };
+      if (!orb.open || now < orb.openedAt + slot * stagger) return pilePose(slot, card.rest);
+
+      const { x: reachX, y: reachY } = reach(orb.radius);
+      const nx = clamp((orb.pointerX - orb.centerX) / reachX, -1, 1);
+      const ny = clamp((orb.pointerY - orb.centerY) / reachY, -1, 1);
+      if (slot === 0) return { x: nx * 6, y: ny * 6, z: 0, rx: ny * -10, ry: nx * 14, rz: 0, s: 1.08, shade: 0 };
+
+      // The pointer turns and tips the ring: near cards follow it, far ones drift the other way.
+      const theta = card.angle + spin + nx * 0.55;
+      const pitch = 0.24 + ny * 0.14;
+      const ringX = orb.radius * Math.sin(theta);
+      const ringZ = orb.radius * Math.cos(theta);
+      const y = card.drift * Math.cos(pitch) + ringZ * Math.sin(pitch);
+      const z = ringZ * Math.cos(pitch) - card.drift * Math.sin(pitch);
+      const depth = perspective / (perspective - z);
+      const lifted = card === hovered;
+      return {
+        x: ringX * depth,
+        y: y * depth,
+        z,
+        rx: 0,
+        ry: Math.sin(theta) * (lifted ? 10 : 28),
+        rz: card.tilt,
+        s: 0.7 * depth * (lifted ? 1.08 : 1),
+        shade: lifted ? 0 : 0.5 * (1 - (z + orb.radius) / (2 * orb.radius)),
+      };
+    };
+
+    const render = ({ el, shade, pose }: Card) => {
+      el.style.transform = `translate(${pose.x}px, ${pose.y}px) perspective(800px) rotateX(${pose.rx}deg) rotateY(${pose.ry}deg) rotate(${pose.rz}deg) scale(${pose.s})`;
+      el.style.zIndex = String(200 + Math.round(pose.z));
+      shade.style.opacity = String(pose.shade);
+    };
+
+    const step = (card: Card, goal: Pose, dt: number) => {
+      for (let remaining = dt; remaining > 0; remaining -= 1 / 120) {
+        const h = Math.min(remaining, 1 / 120);
+        for (const key of poseKeys) {
+          const force = -stiffness * (card.pose[key] - goal[key]) - damping * card.velocity[key];
+          card.velocity[key] += force * h;
+          card.pose[key] += card.velocity[key] * h;
+        }
+      }
+      const settled = poseKeys.every(
+        (key) => Math.abs(card.pose[key] - goal[key]) < 0.005 && Math.abs(card.velocity[key]) < 0.005,
+      );
+      if (settled) {
+        card.pose = goal;
+        card.velocity = zeroPose();
+      }
+      return settled;
+    };
+
+    const tick = (now: number) => {
+      frame = 0;
+      const dt = clamp((now - lastTime) / 1000, 0, 1 / 30);
+      lastTime = now;
+      const animate = !reduceMotion.matches;
+
+      if (orb.open && animate) {
+        spinRate += ((hovered ? 0 : spinSpeed) - spinRate) * (1 - Math.exp(-dt * 6));
+        spin += spinRate * dt;
+      }
+
+      let running = orb.open && animate;
+      for (const card of cards) {
+        const goal = target(card, now);
+        if (animate) {
+          if (!step(card, goal, dt) || card.liftUntil > now) running = true;
+        } else {
+          card.pose = goal;
+          card.velocity = zeroPose();
+        }
+        render(card);
+      }
+      if (running) frame = requestAnimationFrame(tick);
+    };
+
+    const schedule = () => {
+      if (frame) return;
+      lastTime = performance.now();
+      frame = requestAnimationFrame(tick);
+    };
+
+    const setSlot = (card: Card, slot: number) => {
+      card.el.dataset.i = String(slot);
+      card.el.style.setProperty("--i", String(slot));
+      card.rest = restOf(card.el);
+    };
 
     // Send the top card to the back; every other card moves one slot up.
     const shuffle = () => {
-      const top = cards.find((card) => card.dataset.i === "0");
+      const top = cards.find((card) => slotOf(card) === 0);
       if (!top) return;
-      for (const card of cards) {
-        const next = card === top ? cards.length - 1 : Number(card.dataset.i) - 1;
-        card.dataset.i = String(next);
-        card.style.setProperty("--i", String(next));
-      }
-      top.classList.remove("is-shuffling");
-      void top.offsetWidth; // restart the animation when clicking quickly
-      top.classList.add("is-shuffling");
+      for (const card of cards) setSlot(card, card === top ? count - 1 : slotOf(card) - 1);
+      if (!orb.open && !reduceMotion.matches) top.liftUntil = performance.now() + liftDuration;
+      schedule();
     };
 
-    pile.addEventListener("click", shuffle);
+    const bringToFront = (picked: Card) => {
+      const from = slotOf(picked);
+      for (const card of cards) {
+        const slot = slotOf(card);
+        if (card === picked) setSlot(card, 0);
+        else if (slot < from) setSlot(card, slot + 1);
+      }
+      hovered = undefined;
+      schedule();
+    };
+
+    const cardFor = (target: EventTarget | null) => {
+      const el = target instanceof Element ? target.closest(".pile-card") : null;
+      return cards.find((card) => card.el === el);
+    };
+
+    const center = () => {
+      const rect = pile.getBoundingClientRect();
+      return { centerX: rect.left + rect.width / 2, centerY: rect.top + rect.height / 2 };
+    };
+
+    const open = (event: PointerEvent) => {
+      if (orb.open || event.pointerType !== "mouse" || !finePointer.matches || reduceMotion.matches) return;
+      const { centerX, centerY } = center();
+      orb = {
+        open: true,
+        openedAt: performance.now(),
+        // Shrink the ring when the column sits close to the window's left edge.
+        radius: clamp(centerX - 80, 112, 200),
+        centerX,
+        centerY,
+        pointerX: event.clientX,
+        pointerY: event.clientY,
+      };
+      schedule();
+    };
+
+    const close = () => {
+      if (!orb.open) return;
+      orb = { open: false };
+      hovered = undefined;
+      schedule();
+    };
+
+    pile.addEventListener("pointerenter", open);
+    pile.addEventListener("pointerover", (event) => {
+      const card = cardFor(event.target);
+      hovered = orb.open && card && slotOf(card) !== 0 ? card : undefined;
+    });
+    pile.addEventListener("pointerout", (event) => {
+      if (!cardFor(event.relatedTarget)) hovered = undefined;
+    });
+    pile.addEventListener("click", (event) => {
+      const card = cardFor(event.target);
+      if (orb.open && card && slotOf(card) !== 0) bringToFront(card);
+      else shuffle();
+    });
     pile.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         shuffle();
       }
     });
+
+    window.addEventListener(
+      "pointermove",
+      (event) => {
+        if (!orb.open) return;
+        orb.pointerX = event.clientX;
+        orb.pointerY = event.clientY;
+        const { x: reachX, y: reachY } = reach(orb.radius);
+        const dx = (orb.pointerX - orb.centerX) / reachX;
+        const dy = (orb.pointerY - orb.centerY) / reachY;
+        if (dx * dx + dy * dy > 1) close();
+      },
+      { passive: true, signal },
+    );
+    window.addEventListener(
+      "scroll",
+      () => {
+        if (orb.open) Object.assign(orb, center());
+      },
+      { passive: true, signal },
+    );
+    document.documentElement.addEventListener("pointerleave", close, { signal });
+    window.addEventListener("blur", close, { signal });
+    signal.addEventListener("abort", () => cancelAnimationFrame(frame));
   }
-  document.addEventListener("astro:page-load", bindPile);
+
+  let binding: AbortController | undefined;
+  document.addEventListener("astro:page-load", () => {
+    binding?.abort();
+    binding = new AbortController();
+    bindPile(binding.signal);
+  });
 </script>

@@ -121,11 +121,22 @@ const { width, height } = Astro.props;
   const spinSpeed = (2 * Math.PI) / 48;
   const flickVelocity = 0.11;
   const flickDistance = 56;
+  const freeDrag = 48;
+  const rubberReach = 120;
   const tilts = [-6, 5, -3, 7, -5, 4];
   const drifts = [-14, 10, -6, 16, -12, 8];
 
   const zeroPose = (): Pose => ({ x: 0, y: 0, z: 0, rx: 0, ry: 0, rz: 0, s: 0, shade: 0 });
   const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+  // A dragged card follows the finger 1:1 for `freeDrag`, then resists along UIScrollView's
+  // rubber-band curve (c = 0.55). Returns the card offset and the curve's slope there.
+  const rubberBand = (drag: number): [offset: number, slope: number] => {
+    const over = Math.abs(drag) - freeDrag;
+    if (over <= 0) return [drag, 1];
+    const stretch = (over * 0.55) / rubberReach + 1;
+    return [Math.sign(drag) * (freeDrag + (1 - 1 / stretch) * rubberReach), 0.55 / stretch ** 2];
+  };
 
   function bindPile(signal: AbortSignal) {
     const pile = document.querySelector<HTMLElement>("[data-pile]");
@@ -386,7 +397,8 @@ const { width, height } = Astro.props;
         const { card } = ended;
         const dx = ended.lastX - ended.startX;
         card.held = false;
-        card.velocity = { ...zeroPose(), x: ended.velocity * 1000, rz: ended.velocity * 80 };
+        const [, slope] = rubberBand(dx);
+        card.velocity = { ...zeroPose(), x: ended.velocity * 1000 * slope, rz: ended.velocity * 80 * slope };
         if (!cancelled && (Math.abs(dx) > flickDistance || Math.abs(ended.velocity) > flickVelocity)) {
           shuffle((ended.velocity || dx) < 0 ? -1 : 1);
         }
@@ -425,8 +437,8 @@ const { width, height } = Astro.props;
         schedule();
       } else {
         const { card } = gesture;
-        const dx = event.clientX - gesture.startX;
-        card.pose = { ...pilePose(0, card.rest), x: dx, y: Math.abs(dx) * -0.06, rz: card.rest + dx * 0.08 };
+        const [x] = rubberBand(event.clientX - gesture.startX);
+        card.pose = { ...pilePose(0, card.rest), x, y: Math.abs(x) * -0.06, rz: card.rest + x * 0.08 };
         card.velocity = zeroPose();
         render(card, card.pose);
       }

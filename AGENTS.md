@@ -57,7 +57,7 @@ Personal site built with Astro, deployed as static assets on Cloudflare Workers.
 - Intro reveal plays once per session (`sessionStorage`), gated on `prefers-reduced-motion`
 - Hover states only under `(hover: hover) and (pointer: fine)`; 44px tap targets on touch
 - Client JavaScript is limited to the photo pile shuffle and the detail-page back link; both bind on `astro:page-load`
-- Copy style: no period at the end of a paragraph or summary; em dashes with spaces
+- Copy style: no period at the end of a paragraph or summary; no em dashes (commas, colons or parentheses instead; en dashes with spaces for ranges like `Feb 2026 – now`)
 - Section titles are body-size Inter at weight 500 (no mono, no uppercase); dates are 13px tabular labels on the right of each row, years only on the index (`years()` in index.astro), full periods on detail pages
 
 ### Dev feedback (Agentation)

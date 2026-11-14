@@ -122,9 +122,8 @@ const { width, height } = Astro.props;
   const deckSpring = spring(0.42, 0.25);
   const pressSpring = spring(0.2, 0);
   const pressScale = 0.95;
-  // UIScrollView's bounce back as reconstructed in super-ultra/ScrollMechanics: mass 1, stiffness 100,
-  // critically damped, so a released pull snaps home without overshoot.
-  const bounceSpring: Spring = { stiffness: 100, damping: 20 };
+  // A released stretch snaps home quickly, with the slightest overshoot a let-go rubber band has.
+  const bounceSpring = spring(0.28, 0.1);
   const liftDuration = 200;
   const perspective = 640;
   const spinSpeed = (2 * Math.PI) / 48;
@@ -155,9 +154,9 @@ const { width, height } = Astro.props;
     const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
     const finePointer = matchMedia("(hover: hover) and (pointer: fine)");
     const count = elements.length;
-    // A swiped card follows the finger 1:1 across its own width, then stretches on UIScrollView's rubber band.
+    // A swiped card follows the finger 1:1 for a quarter of its width, then stretches on UIScrollView's rubber band.
     const follow = (drag: number): [offset: number, slope: number] => {
-      const free = pile.offsetWidth;
+      const free = pile.offsetWidth / 4;
       if (Math.abs(drag) <= free) return [drag, 1];
       const [extra, slope] = rubberBand(drag - Math.sign(drag) * free, innerWidth);
       return [Math.sign(drag) * free + extra, slope];
@@ -437,10 +436,11 @@ const { width, height } = Astro.props;
         const [x, slope] = follow(ended.grabX + ended.lastX - ended.startX);
         card.held = false;
         card.velocity = { ...zeroPose(), x: velocity * 1000 * slope, rz: velocity * 80 * slope };
-        // Where the card would coast to decides: past most of its width it goes to the back, otherwise home.
-        const landing = x + project(velocity * slope);
-        if (!cancelled && Math.abs(landing) > pile.offsetWidth * 0.6) {
-          shuffle(landing < 0 ? -1 : 1, landing);
+        // A stretch springs home however far it went; only a flick outward, one that would coast on past most of the
+        // card's width, throws the card to the back.
+        const coast = project(velocity * slope);
+        if (!cancelled && Math.abs(coast) > pile.offsetWidth * 0.6 && Math.sign(coast) === Math.sign(x)) {
+          shuffle(coast < 0 ? -1 : 1, x + coast);
         } else {
           card.spring = bounceSpring;
         }

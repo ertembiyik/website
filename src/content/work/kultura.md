@@ -1,7 +1,7 @@
 ---
 title: Kultura Records Store
 role: iOS engineer
-period: Jun 2021 — Oct 2022
+period: Jun 2021 – Oct 2022
 summary: Scan a record in the shop and listen to what is on it
 links:
   - label: kulturarecordstore.ru

@@ -1,6 +1,6 @@
 ---
 title: Reality
-year: 2023 — 2024
+year: 2023 – 2024
 summary: A persistent AR layer over the real world, anchored with geospatial tech
 links:
   - label: App Store

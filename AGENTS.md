@@ -57,11 +57,8 @@ Personal site built with Astro, deployed as static assets on Cloudflare Workers.
 - Intro reveal plays once per session (`sessionStorage`), gated on `prefers-reduced-motion`
 - Hover states only under `(hover: hover) and (pointer: fine)`; 44px tap targets on touch
 - Client JavaScript is limited to the photo pile (shuffle and orb) and the detail-page back link; both bind on `astro:page-load`
-- Copy style: no period at the end of a paragraph or summary; em dashes with spaces
+- Copy style: no period at the end of a paragraph or summary; no em dashes (commas, colons or parentheses instead; en dashes with spaces for ranges like `Feb 2026 – now`)
 - Section titles are body-size Inter at weight 500 (no mono, no uppercase); dates are 13px tabular labels on the right of each row, years only on the index (`years()` in index.astro), full periods on detail pages
-
-### Dev feedback (Agentation)
-- `src/dev/agentation.ts` mounts the [Agentation](https://agentation.com) toolbar with React in copy-prompt mode (annotate, copy the markdown, paste it to the agent); it carries the toolbar's stylesheets through `astro:before-swap` and remounts on `astro:after-swap`. `Layout.astro` loads it through an inline module script only when `import.meta.env.DEV`, so React (a devDependency) never ships to production. No MCP server is configured
 
 ### Agent readiness
 - `public/robots.txt` declares Content Signals (`search=yes, ai-input=yes, ai-train=yes`) and names the AI crawlers; `public/_headers` repeats the signal as a response header and adds `Link` headers to `/llms.txt` and the sitemap

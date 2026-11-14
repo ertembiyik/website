@@ -1,7 +1,7 @@
 ---
 title: Pool
 role: Founding engineer
-period: Feb 2026 — now
+period: Feb 2026 – now
 summary: AI screenshot app with 75M+ saved screenshots. I lead iOS
 links:
   - label: pool.day

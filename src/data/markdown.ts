@@ -20,7 +20,7 @@ const entryLine = (category: Category, entry: Entry) =>
   `- [${heading(entry)}](${site}/${category}/${entry.id}/index.md): ${entry.data.summary} (${when(entry)})`;
 
 export const intro =
-  "I make apps for Apple platforms. Sometimes poke at what's underneath them. In my free time I build consumer + AI side projects with friends, skate, play tennis, and nerd out on X. Now founding engineer at Pool — the fastest way to save anything with a screenshot. Before that, three years at VK shipping a superapp to 100M+ people";
+  "I make apps for Apple platforms. Sometimes poke at what's underneath them. In my free time I build consumer + AI side projects with friends, skate, play tennis, and nerd out on X. Now founding engineer at Pool, the fastest way to save anything with a screenshot. Before that, three years at VK shipping a superapp to 100M+ people";
 
 const connect = [
   `- Email: ${profile.email}`,

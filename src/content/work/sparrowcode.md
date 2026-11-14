@@ -1,7 +1,7 @@
 ---
 title: Sparrowcode
 role: iOS engineer
-period: Feb 2022 — Jul 2022
+period: Feb 2022 – Jul 2022
 summary: Built a comprehensive Ethereum library in Swift
 links:
   - label: sparrowcode.io

@@ -1,7 +1,7 @@
 ---
 title: datin
 year: "2026"
-summary: Agent-native dating — a CLI your AI agent uses to find you a date
+summary: "Agent-native dating: a CLI your AI agent uses to find you a date"
 links:
   - label: datinapp.com
     url: https://datinapp.com
@@ -12,7 +12,7 @@ order: 1
 ---
 
 
-Dating with no app. Your own agent — Claude Code, Codex, or another — is the interface, and the datin CLI is the client it calls
+Dating with no app. Your own agent (Claude Code, Codex, or another) is the interface, and the datin CLI is the client it calls
 
 Your agent asks before reading anything personal, and you approve your profile before it's uploaded
 

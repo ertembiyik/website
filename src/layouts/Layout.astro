@@ -14,7 +14,7 @@ interface Props {
 const { title, description = profile.description, home = false } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site);
 const socialImage = new URL("/og-card.png", Astro.site);
-const pageTitle = home ? title : `${title} — ${profile.name}`;
+const pageTitle = home ? title : `${title} · ${profile.name}`;
 
 // Every page except the 404 has a Markdown twin for agents (see src/data/markdown.ts).
 const isNotFound = Astro.url.pathname.replace(/\/$/, "") === "/404";
@@ -126,7 +126,5 @@ const fontFaces = `
         nameOnly(used ?? links[links.length - 1]);
       });
     </script>
-    {/* Agentation feedback toolbar, dev server only. The module is never referenced by production builds. */}
-    {import.meta.env.DEV && <script is:inline type="module" src="/src/dev/agentation.ts"></script>}
   </body>
 </html>

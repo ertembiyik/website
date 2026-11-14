@@ -1,7 +1,7 @@
 ---
 title: Bluerage Software
 role: Founder
-period: Mar 2025 — Feb 2026
+period: Mar 2025 – Feb 2026
 summary: Prompt-to-mini-app platform, pivoted to an agent-driven take on Apple Shortcuts
 links:
   - label: bluerage.software

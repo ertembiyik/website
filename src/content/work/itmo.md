@@ -1,7 +1,7 @@
 ---
 title: ITMO University
 role: iOS lecturer
-period: Sep 2023 — Jan 2024
+period: Sep 2023 – Jan 2024
 summary: Taught iOS development to the most-winning ICPC students
 icon: ../../assets/icons/itmo.png
 order: 4

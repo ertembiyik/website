@@ -508,6 +508,48 @@ h3 {
   transition: color 150ms ease;
 }
 
+/* ---- ASCII garland ------------------------------------------------------ */
+
+/* Wider than the column, like a shelf; narrow screens show the centre at a readable size. */
+.garland {
+  --garland-width: min(100vw - 2rem, 58rem);
+  display: flex;
+  justify-content: center;
+  width: var(--garland-width);
+  margin-inline: calc((100% - var(--garland-width)) / 2);
+  margin-bottom: -2.25rem;
+  overflow: hidden;
+  container-type: inline-size;
+  user-select: none;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.garland-art {
+  position: relative;
+  flex: none;
+}
+
+.garland pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  /* `--cols` cells of 0.6em (Geist Mono's advance) fill the garland; never below a legible size. */
+  font-size: max(calc(100cqw / (var(--cols) * 0.6)), 4.2px);
+  line-height: 0.975;
+  letter-spacing: 0;
+  white-space: pre;
+}
+
+.garland canvas {
+  position: absolute;
+  pointer-events: none;
+}
+
+.garland[data-live] pre {
+  visibility: hidden;
+}
+
 /* ---- Detail pages ------------------------------------------------------- */
 
 .detail {

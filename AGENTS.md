@@ -48,6 +48,7 @@ Personal site built with Astro, deployed as static assets on Cloudflare Workers.
 - **AppIcon.astro** - Renders an image inside an Apple-style squircle (`corner-shape: squircle` with an SVG mask fallback) and optionally assigns a `view-transition-name`
 - **IconTile.astro** - Monochrome glyph in a squircle tile with a hover tooltip, used for the Connect row
 - **PhotoStack.astro** - The hero pile of photos/videos. A mouse hover (fine pointers) or a tap opens it into an orb around the top photo: the ring follows the pointer, or spins when dragged on touch, and a picked card swaps places with the top photo. A click on the top card, or a sideways swipe on touch, sends it to the back. One spring drives every move; reduced motion keeps the orb off
+- **AsciiGarland.astro** - The flower garland above the footer. `src/assets/garland.svg` (a painted illustration, edit it to change the art) is rasterised with sharp at build time and turned into coloured characters: one glyph per 8×13 px cell from coverage, light and edges, colours snapped to a 48-tone k-means palette. Wider than the column on desktop; phones show the centre. On hover or touch it redraws on a canvas and the flowers sway on per-column springs coupled into a wind field; reduced motion keeps the static art
 - **Layout.astro** - Metadata, font preloads, and the once-per-session intro flag
 
 ### Styling and motion
@@ -56,7 +57,7 @@ Personal site built with Astro, deployed as static assets on Cloudflare Workers.
 - `<ClientRouter />` (astro:transitions) swaps pages in place, so view transitions run without a document reload; an entry's icon and title morph into the detail heading via `icon-<id>` / `title-<id>` names. Detail pages carry them statically; on the index several links can point at one entry (the intro sentence and its row), so candidates are marked with `data-morph` inside an `a[data-morph-scope]` and the script in `Layout.astro` assigns the names at navigation time to the link that was used, and restores them on that same link when coming back. Scripts bind on `astro:page-load`
 - Intro reveal plays once per session (`sessionStorage`), gated on `prefers-reduced-motion`
 - Hover states only under `(hover: hover) and (pointer: fine)`; 44px tap targets on touch
-- Client JavaScript is limited to the photo pile (shuffle and orb) and the detail-page back link; both bind on `astro:page-load`
+- Client JavaScript is limited to the photo pile (shuffle and orb), the garland's wind, and the detail-page back link; all bind on `astro:page-load`
 - Copy style: no period at the end of a paragraph or summary; em dashes with spaces
 - Section titles are body-size Inter at weight 500 (no mono, no uppercase); dates are 13px tabular labels on the right of each row, years only on the index (`years()` in index.astro), full periods on detail pages
 

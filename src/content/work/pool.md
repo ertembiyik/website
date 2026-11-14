@@ -6,6 +6,8 @@ summary: AI screenshot app with 75M+ saved screenshots. I lead iOS
 links:
   - label: pool.day
     url: https://pool.day
+  - label: App Store
+    url: https://apps.apple.com/app/id6752956163
   - label: TechCrunch
     url: https://techcrunch.com/2026/06/11/pools-new-app-turns-your-screenshots-into-a-searchable-memory-bank/
 icon: ../../assets/icons/pool.png

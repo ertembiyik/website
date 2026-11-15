@@ -86,6 +86,19 @@ const fontFaces = `
         /* sessionStorage unavailable: play nothing rather than flash. */
       }
     </script>
+
+    {/* Cloudflare Web Analytics, production builds only. The head survives page swaps, so the beacon loads once and
+        reports each swap itself; in the body it would be swapped out and could load again. */}
+    {
+      import.meta.env.PROD && (
+        <script
+          is:inline
+          type="module"
+          src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon={JSON.stringify({ token: "2b5828990e5e4b3e9cedb083e555fb5b" })}
+        />
+      )
+    }
   </head>
   <body>
     <a class="skip-link" href="#content">Skip to content</a>

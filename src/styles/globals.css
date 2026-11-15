@@ -858,15 +858,10 @@ html[data-intro] .reveal {
 
 /* ---- View transitions --------------------------------------------------- */
 
-/* Fade through: the old page is nearly gone before the new one starts, so they never print over each other. */
-::view-transition-old(root) {
-  animation-duration: 140ms;
-  animation-timing-function: var(--ease-out);
-}
-
+/* One curve for both pages, so together they always add up to a whole page: no dip to black. */
+::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 220ms;
-  animation-delay: 60ms;
+  animation-duration: 240ms;
   animation-timing-function: var(--ease-out);
 }
 
@@ -874,6 +869,13 @@ html[data-intro] .reveal {
 ::view-transition-group(*) {
   animation-duration: 280ms;
   animation-timing-function: var(--ease-ios);
+}
+
+/* iPhone Safari paints under its bars, beyond what a page snapshot covers; there only icons and titles travel. */
+@supports (-webkit-touch-callout: none) {
+  :root {
+    view-transition-name: none;
+  }
 }
 
 /* ---- Small screens ------------------------------------------------------ */

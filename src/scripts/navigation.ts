@@ -21,6 +21,11 @@ document.addEventListener("astro:before-preparation", (event) => {
 });
 
 document.addEventListener("astro:after-swap", () => {
+  // Icons load lazily on a full load; after a swap they are cached, and lazy loading would paint them frames late.
+  for (const img of document.querySelectorAll<HTMLImageElement>(".squircle img")) {
+    img.loading = "eager";
+    img.decoding = "sync";
+  }
   const links = [...document.querySelectorAll<HTMLAnchorElement>("a[data-morph-scope]")].filter(
     (link) => path(link) === leaving,
   );

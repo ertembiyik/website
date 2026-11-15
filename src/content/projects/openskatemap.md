@@ -10,11 +10,6 @@ links:
   - label: TestFlight
     url: https://testflight.apple.com/join/3pFyeYVS
 icon: ../../assets/icons/openskatemap.png
-screens:
-  - ../../assets/screens/openskatemap/discover.jpg
-  - ../../assets/screens/openskatemap/spot.jpg
-  - ../../assets/screens/openskatemap/review.jpg
-  - ../../assets/screens/openskatemap/collection.jpg
 order: 1
 ---
 

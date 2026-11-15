@@ -1,79 +1,60 @@
-import type { CollectionEntry } from "astro:content";
-import { links, profile, writing } from "./site";
+import { type Entries, type Entry, entryUrl, metaLine, when } from "./entries";
+import { connect, profile, writing } from "./site";
 
 /** Markdown twins of the HTML pages, for agents: /llms.txt, /index.md, and /<category>/<slug>/index.md. */
 
-export type Category = "work" | "projects" | "speaking";
-type Entry = CollectionEntry<Category>;
+const absolute = (path: string) => new URL(path, import.meta.env.SITE).href;
 
-const site = "https://ertembiyik.com";
+const heading = (entry: Entry) => (entry.collection === "work" ? `${entry.data.role} at ${entry.data.title}` : entry.data.title);
 
-const byOrder = (a: Entry, b: Entry) => a.data.order - b.data.order;
+const entryLine = (entry: Entry) =>
+  `- [${heading(entry)}](${absolute(`${entryUrl(entry)}index.md`)}): ${entry.data.summary} (${when(entry)})`;
 
-const when = (entry: Entry) =>
-  "period" in entry.data ? entry.data.period : "event" in entry.data ? `${entry.data.event}, ${entry.data.year}` : entry.data.year;
+/** The intro with its work entries resolved, as from `introParagraphs()`. */
+export type Intro = readonly (readonly (string | Entry)[])[];
 
-const heading = (entry: Entry) =>
-  "role" in entry.data ? `${entry.data.role} at ${entry.data.title}` : entry.data.title;
-
-const entryLine = (category: Category, entry: Entry) =>
-  `- [${heading(entry)}](${site}/${category}/${entry.id}/index.md): ${entry.data.summary} (${when(entry)})`;
-
-export const intro =
-  "I make apps for Apple platforms. Sometimes poke at what's underneath them. In my free time I build consumer + AI side projects with friends, skate, play tennis, and nerd out on X. Now founding engineer at Pool, the fastest way to save anything with a screenshot. Before that, three years at VK shipping a superapp to 100M+ people";
-
-const connect = [
-  `- Email: ${profile.email}`,
-  `- X: ${links.x}`,
-  `- GitHub: ${links.github}`,
-  `- Telegram: ${links.telegram}`,
-  `- LinkedIn: ${links.linkedin}`,
-  `- Book a call: ${links.cal}`,
-].join("\n");
-
-interface Collections {
-  work: CollectionEntry<"work">[];
-  projects: CollectionEntry<"projects">[];
-  speaking: CollectionEntry<"speaking">[];
-}
+const introMarkdown = (intro: Intro) =>
+  intro
+    .map((paragraph) =>
+      paragraph
+        .map((part) => (typeof part === "string" ? part : `[${part.data.title}](${absolute(`${entryUrl(part)}index.md`)})`))
+        .join(""),
+    )
+    .join("\n\n");
 
 /** A Markdown document: blocks separated by a blank line, empty ones dropped, one final newline. */
 const markdownDocument = (blocks: readonly string[]) => `${blocks.filter((block) => block !== "").join("\n\n")}\n`;
 
-function sections({ work, projects, speaking }: Collections) {
-  return [
+const sections = ({ work, projects, speaking }: Entries) =>
+  [
     "## Experience",
-    [...work].sort(byOrder).map((entry) => entryLine("work", entry)).join("\n"),
+    work.map(entryLine).join("\n"),
     "## Side projects",
-    [...projects].sort(byOrder).map((entry) => entryLine("projects", entry)).join("\n"),
+    projects.map(entryLine).join("\n"),
     "## Writing and talks",
-    [
-      ...writing.map((post) => `- [${post.title}](${post.href}) (${post.year})`),
-      ...[...speaking].sort(byOrder).map((entry) => entryLine("speaking", entry)),
-    ].join("\n"),
+    [...writing.map((post) => `- [${post.title}](${post.href}) (${post.year})`), ...speaking.map(entryLine)].join("\n"),
     "## Connect",
-    connect,
+    connect.map(({ label, href }) => `- ${label}: ${href.replace(/^mailto:/, "")}`).join("\n"),
   ].join("\n\n");
-}
 
 /** llms.txt: H1, blockquote summary, then link lists (https://llmstxt.org/). */
-export const llmsTxt = (collections: Collections) =>
+export const llmsTxt = (entries: Entries) =>
   markdownDocument([
     `# ${profile.name}`,
     `> ${profile.description}. Every page has a Markdown twin at <page URL>/index.md, and HTML pages answer \`Accept: text/markdown\`.`,
-    `- [Home](${site}/index.md): intro, experience, side projects, writing, and contact`,
-    sections(collections),
+    `- [Home](${absolute("/index.md")}): intro, experience, side projects, writing, and contact`,
+    sections(entries),
   ]);
 
-export const homeMarkdown = (collections: Collections) =>
-  markdownDocument([`# ${profile.name}`, intro, sections(collections)]);
+export const homeMarkdown = (entries: Entries, intro: Intro) =>
+  markdownDocument([`# ${profile.name}`, introMarkdown(intro), sections(entries)]);
 
-export const entryMarkdown = (category: Category, entry: Entry) =>
+export const entryMarkdown = (entry: Entry) =>
   markdownDocument([
     `# ${entry.data.title}`,
-    `${"role" in entry.data ? `${entry.data.role} · ` : ""}${when(entry)}`,
+    metaLine(entry),
     entry.data.summary,
     entry.data.links.map((link) => `- [${link.label}](${link.url})`).join("\n"),
     (entry.body ?? "").trim(),
-    `[← ${profile.name}](${site}/index.md)`,
+    `[← ${profile.name}](${absolute("/index.md")})`,
   ]);

@@ -17,18 +17,19 @@ bun run deploy       # Build and deploy to Cloudflare Workers
 
 ## Architecture
 
-Personal site built with Astro, deployed as static assets on Cloudflare Workers. One dark, narrow column (39rem): avatar, short first-person intro, experience, side projects, writing, stack, contact. Zero framework JavaScript.
+Personal site built with Astro, deployed as static assets on Cloudflare Workers. One dark, narrow column (39rem): a photo pile, short first-person intro, experience, side projects, writing and talks, contact, and a flower garland above the footer. Zero framework JavaScript.
 
 ### Tech Stack
 - **Astro 7** - Static site generator with `output: 'static'`
 - **TypeScript** - Strict mode via Astro's tsconfig
 - **Astro Content Collections** - Typed Markdown-backed work, project, and speaking entries with `image()` icons
-- **astro:assets** - App icons and the avatar are optimized at build time (1x/2x/3x webp)
-- **Cloudflare Workers Assets** - Hosting via Wrangler asset deployment
+- **astro:assets** - App icons and photos are optimized at build time (1x/2x/3x webp)
+- **Cloudflare Workers Assets** - Hosting via Wrangler asset deployment. Config stays in `wrangler.jsonc`: Cloudflare's `cloudflare.config.ts` (the `cf` CLI) was evaluated in November 2026, and `cf build` cannot take a static Astro `dist/` without adding the Cloudflare adapter, while `cf` and the config format are still beta. Revisit when both are stable and a static build deploys without the adapter. Wrangler is pinned exactly, and bun's 7-day minimum release age applies to upgrades
 - **Inter Variable + Geist Mono Variable** - Self-hosted from fontsource packages, preloaded
 
 ### Content Structure
-- `src/data/site.ts` - Profile copy, links, external writing, and the Connect row (inline Simple Icons glyph paths)
+- `src/data/site.ts` - Profile copy, the intro (written once: strings plus `{ work }` references that the hero renders as morphing app chips and the Markdown twins as links), `current` (the work entry the intro and the home page's JSON-LD point at), links, external writing, and the Connect row (inline Simple Icons glyph paths)
+- `src/data/entries.ts` - The one place that loads and orders the collections (`loadEntries()`), builds the detail routes (`entryPaths()`), entry URLs (`entryUrl()`), and the date and meta lines (`when()`, `metaLine()`, exhaustive over `entry.collection`)
 - `src/content/work/*.md` - Work experience entries (`role`, `period`, optional `icon`)
 - `src/content/projects/*.md` - Side project entries (`year`, `icon`)
 - `src/content/speaking/*.md` - Talks (`event`, `year`, `icon`)
@@ -40,17 +41,17 @@ Personal site built with Astro, deployed as static assets on Cloudflare Workers.
 - Dynamic routes use `getStaticPaths()` and `render()` for static generation
 
 ### Data Flow
-1. `src/pages/index.astro` queries typed collections with `getCollection()`
+1. Pages and the Markdown endpoints load entries through `src/data/entries.ts`, never `getCollection()` directly
 2. Collection frontmatter supplies summaries, icons, and metadata for the index
 3. Markdown bodies render only on detail pages through the shared dynamic route
-4. Site-wide profile and writing data comes from `src/data/site.ts`
+4. Site-wide profile, intro and writing data comes from `src/data/site.ts`; the HTML and its Markdown twin render the same values
 
 ### Key Components
-- **AppIcon.astro** - Renders an image inside an Apple-style squircle (`corner-shape: squircle` with an SVG mask fallback) and optionally assigns a `view-transition-name`
+- **AppIcon.astro** - Renders an image inside an Apple-style squircle (an SVG mask, so every browser clips the same shape) and either a static `view-transition-name` (detail pages) or a `data-morph` candidate (the index)
 - **IconTile.astro** - Monochrome glyph in a squircle tile with a hover tooltip, used for the Connect row
 - **PhotoStack.astro** - The hero pile of photos/videos. A mouse hover (fine pointers) or a tap opens it into an orb around the top photo: the ring follows the pointer, or spins when dragged on touch, and a picked card swaps places with the top photo. The ring shares its places evenly among the cards other than the top one, and the pile opens in one move. A click on the top card, or a sideways swipe on touch, sends it to the back: a pressed card shrinks at once, a swiped one follows the finger 1:1 for a quarter of its width and then rubber-bands against its own width (so it never travels much past one card), and letting go in the stretch, or flicking so it would coast into it (UIScrollView's deceleration projection), sends it to the back, while a small drag that stays in the free stretch springs home. Every move is a spring, with a little bounce only after a throw; reduced motion keeps the orb off
 - **AsciiGarland.astro** - The flower garland above the footer. `src/assets/garland.svg` (a painted illustration, edit it to change the art) is rasterised with sharp at build time and turned into coloured characters: one glyph per 8×13 px cell from coverage, light and edges; colours lifted in OKLCH, snapped to a 48-tone k-means palette and written in Display P3 (also emitted per tone in `data-tones`). It sits one section gap below the last section, its six rows of sky rising into that gap, with its ground running straight into the footer (no rule between them) (`-webkit-text-size-adjust: 100%` on `html` keeps iPhone Safari from inflating its 4px glyphs, which threw the layout off; it stands alone because the CSS minifier drops a prefixed declaration that sits beside its unprefixed twin, and Safari reads only the prefixed one). It runs full bleed: the painting tiles seamlessly (flower heads stay clear of the seam) and repeats across any width. The script finds each flower (connected same-hue patches) and draws everything with WebGL 2: every glyph is one instance of a quad over a white glyph atlas, the vertex shader moves it by its plant's bend or the wave field from a small float texture, a second instanced pass with a blurred atlas adds the glow, flower heads paint an opaque cell behind themselves (back-to-front order) and the edge fade is done in the shader. Physics: each stem is a cantilever rooted at the ground under a heavy head, drawn in the beam's exact shape for the loads on it, with the head riding the tip as one piece; the head swings with inertia toward a 1D wave field driven by a breeze and rolling gusts. The hand is a soft spring rather than a wall: a touched point gives part of the way, so a slow push bends a flower (pushed low, the head swings further), and a fast swipe, which can cross a stem between pointer events, flicks whatever its path runs through toward its own speed; a stem the hand slips off springs back, leaves follow the field, the pointer or a finger pushes plants aside and stirs the field, and bees (about one per 90 columns in view, flying across the whole width rather than repeating with the painting, each on a flower of its own) hover between flowers, and butterflies (about one per 160 columns, `\i/` over `/'\` wings that fold through `| |` to `' '`) each in a random sky blue, white, lemon or lilac, drift between the tall flowers in bursts of bobbing wingbeats and short glides on open wings, land on a head and ride it as it sways, and fly off when a hand comes near. Untouched it draws from a timer at about 24fps; after 8s without scrolling, pointer or keys the breeze dies down, the bees land and drawing stops (0% CPU) until something moves. Without WebGL 2 or with reduced motion the static art shows
-- **Layout.astro** - Metadata, font preloads, and the once-per-session intro flag
+- **Layout.astro** - Metadata, font preloads, the once-per-session intro flag, optional JSON-LD (`jsonLd`), and `notFound` for the 404 (no canonical, no Markdown twin, `noindex`)
 
 ### Styling and motion
 - Global styles and CSS variables live in `src/styles/globals.css`
@@ -60,14 +61,14 @@ Personal site built with Astro, deployed as static assets on Cloudflare Workers.
 - Navigation speed: internal links use the canonical trailing-slash URL (production redirects `/work/pool` to `/work/pool/`). `navigation.ts` prefetches visible internal links with the same `fetch()` the router sends (Astro's prefetch is off: its `<link rel="prefetch">` sends a navigation `Accept`, which `Vary: Accept` keeps apart from the router's request), and pages are fresh for 5 minutes (`public/_headers`), so a tap or a back press usually swaps from cache. Heavy page setup awaits `transitionEnd()` from `navigation.ts` so it stays out of the transition (the garland does, unless it is in view)
 - Intro reveal plays once per session (`sessionStorage`), gated on `prefers-reduced-motion`
 - Hover states only under `(hover: hover) and (pointer: fine)`; 44px tap targets on touch
-- Client JavaScript is limited to the photo pile (shuffle and orb), the garland's wind, the detail-page back link, and the navigation glue; all bind on `astro:page-load`
+- Client JavaScript is limited to the photo pile (shuffle and orb), the garland's wind, and the navigation glue in `src/scripts/navigation.ts` (morph names, compositor morph, prefetch, the detail page's back link, `transitionEnd()`)
 - Copy style: no period at the end of a paragraph or summary; no em dashes (commas, colons or parentheses instead; en dashes with spaces for ranges like `Feb 2026 – now`)
 - Section titles are body-size Inter at weight 500 (no mono, no uppercase); dates are 13px tabular labels on the right of each row, years only on the index (`years()` in index.astro), full periods on detail pages
 
 ### Agent readiness
 - `public/robots.txt` declares Content Signals (`search=yes, ai-input=yes, ai-train=yes`) and names the AI crawlers; `public/_headers` repeats the signal as a response header and adds `Link` headers to `/llms.txt` and the sitemap
 - `src/data/markdown.ts` builds Markdown twins from the same collections: `/llms.txt`, `/index.md`, and `/<category>/<slug>/index.md` (endpoints under `src/pages/`); each HTML page links its twin with `<link rel="alternate" type="text/markdown">`
-- `worker/negotiate.ts` (called from the `worker/index.ts` entry) answers `Accept: text/markdown` on page paths with the twin and hands every other request to static assets untouched; `worker/accept.ts` parses Accept per RFC 9110. `wrangler.jsonc` routes only `/`, `/work/*`, `/projects/*`, `/speaking/*` through it, and `public/_headers` sets `Vary: Accept` on both variants plus a UTF-8 charset on `.md` and `.txt`, so the Worker returns asset responses as they are and never builds its own. `workers_dev` is off: production is served from ertembiyik.com only, with preview URLs kept for pull requests. The Worker has its own `worker/tsconfig.json` against types from `wrangler types` (generated by `bun run check`, not committed) and is covered by `bun test`. `negotiate.ts` and `accept.ts` use only web-standard globals, so the tests type-check against Bun's types (`worker/tsconfig.test.json`) with no casts
+- `worker/negotiate.ts` (called from the `worker/index.ts` entry) answers `Accept: text/markdown` on page paths with the twin (a direct `…/index.md` request passes straight through) and hands every other request to static assets untouched; `worker/accept.ts` parses Accept per RFC 9110. `wrangler.jsonc` routes only `/`, `/work/*`, `/projects/*`, `/speaking/*` through it, and `public/_headers` sets `Vary: Accept` on both variants plus a UTF-8 charset on `.md` and `.txt`, so the Worker returns asset responses as they are and never builds its own. `workers_dev` is off: production is served from ertembiyik.com only, with preview URLs kept for pull requests. The Worker has its own `worker/tsconfig.json` against types from `wrangler types` (generated by `bun run check`, not committed) and is covered by `bun test`. `negotiate.ts` and `accept.ts` use only web-standard globals, so the tests type-check against Bun's types (`worker/tsconfig.test.json`) with no casts
 - The home page carries a schema.org `Person` JSON-LD block
 - Lighthouse's Agentic Browsing category keys off the accessibility tree: keep ARIA attributes on elements with a valid role, and keep text at 4.5:1 (`--text-3` is the floor)
 

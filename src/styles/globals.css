@@ -75,16 +75,6 @@ a {
   touch-action: manipulation;
 }
 
-button {
-  font: inherit;
-  color: inherit;
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
 p {
   text-wrap: pretty;
 }
@@ -174,18 +164,6 @@ h3 {
   color: var(--text);
 }
 
-.section > p {
-  color: var(--text-2);
-}
-
-.section > p a {
-  color: var(--text);
-  text-decoration: underline;
-  text-decoration-color: var(--text-3);
-  text-underline-offset: 0.2em;
-  transition: text-decoration-color 150ms ease;
-}
-
 /* ---- Apple squircle ----------------------------------------------------- */
 
 /* The iOS icon outline as a mask, so every browser clips to the exact same shape. */
@@ -208,23 +186,20 @@ h3 {
   object-fit: cover;
 }
 
+/* Wordmark tiles ("Cal") are set bold and tight, sized to the tile like the glyphs. */
 .squircle-glyph {
   align-items: center;
   justify-content: center;
   color: var(--text);
+  font-size: calc(var(--size) * 0.4);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 
 .squircle-glyph svg {
   width: calc(50% * var(--glyph-scale, 1));
   height: calc(50% * var(--glyph-scale, 1));
-}
-
-/* Wordmark tiles ("Cal"): bold, tight, sized to the tile like the glyphs. */
-.squircle-glyph {
-  font-size: calc(var(--size) * 0.4);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1;
 }
 
 /* ---- Hero --------------------------------------------------------------- */
@@ -255,10 +230,6 @@ h3 {
   font-weight: 500;
   text-decoration: none;
   transition: color 150ms ease;
-}
-
-.inline-app .squircle {
-  --size: 18px;
 }
 
 /* ---- Photo pile --------------------------------------------------------- */
@@ -323,7 +294,7 @@ h3 {
   pointer-events: none;
 }
 
-/* ---- Icon tiles (stack, connect) ---------------------------------------- */
+/* ---- Icon tiles (connect) ----------------------------------------------- */
 
 .tiles {
   list-style: none;
@@ -334,7 +305,6 @@ h3 {
 }
 
 .tile {
-  --size: 36px;
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -425,10 +395,6 @@ h3 {
   align-items: center;
   gap: 0.3em;
   font-weight: 500;
-}
-
-.row-title .squircle {
-  --size: 18px;
 }
 
 .row-summary {
@@ -812,7 +778,6 @@ h3 {
     transform: translate(-50%, -2px);
   }
 
-  .inline-app:hover,
   .site-footer .label a:hover,
   .back:hover {
     color: var(--text);
@@ -831,7 +796,6 @@ h3 {
     color: var(--text-2);
   }
 
-  .section > p a:hover,
   .prose :where(a):hover {
     text-decoration-color: currentColor;
   }
@@ -901,18 +865,6 @@ html[data-intro] .reveal {
 
 @media (prefers-reduced-motion: reduce) {
   html[data-intro] .reveal {
-    animation: none;
-  }
-
-  .row,
-  .pill,
-  .arrow,
-  .back,
-  .back-arrow,
-  .pile-card,
-  .tile .squircle,
-  .tile-name,
-  .skip-link {
     animation: none;
   }
 

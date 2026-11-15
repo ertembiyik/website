@@ -5,6 +5,26 @@ export const profile = {
   email: "hi@ertembiyik.com",
 } as const;
 
+/** Where I work now; the intro and the home page's structured data both point at it. */
+export const current = { work: "pool" } as const;
+
+/**
+ * The intro, written once. Strings are text; `{ work }` names a work entry, which the hero renders as an app
+ * chip that morphs into its page and the Markdown twins render as a link.
+ */
+export const intro: readonly (readonly (string | { readonly work: string })[])[] = [
+  [
+    "Hi, I’m Ertem. I make apps for Apple platforms. Sometimes poke at what’s underneath them. In my free time I build consumer + AI side projects with friends, skate, play tennis, and nerd out on X",
+  ],
+  [
+    "Now founding engineer at ",
+    current,
+    ", the fastest way to save anything with a screenshot. Before that, three years at ",
+    { work: "vk" },
+    " shipping a superapp to 100M+ people",
+  ],
+];
+
 export const links = {
   x: "https://x.com/ertembiyik",
   github: "https://github.com/ertembiyik",
@@ -13,7 +33,6 @@ export const links = {
   cal: "https://cal.com/ertembiyik",
   source: "https://github.com/ertembiyik/website",
 } as const;
-
 
 export const writing = [
   {
@@ -38,7 +57,7 @@ export const writing = [
   },
 ] as const;
 
-type ConnectLink = { label: string; href: string; /** Optical size tweak, 1 = default. */ scale?: number } & (
+export type ConnectLink = { label: string; href: string; /** Optical size tweak, 1 = default. */ scale?: number } & (
   | { /** 24×24 path drawn in the page's monochrome style; `stroke` for outline icons like Heroicons. */ glyph: string; stroke?: boolean }
   | { /** A short wordmark set in the site font, like Cal.com's "Cal" tile. */ text: string }
 );

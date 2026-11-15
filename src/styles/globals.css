@@ -865,10 +865,17 @@ html[data-intro] .reveal {
   animation-timing-function: var(--ease-out);
 }
 
-/* The iOS curve eases in rather than jumping a fifth of the way on frame one; navigation.ts runs it as a scale. */
+/* The iOS drawer curve front-loads travel: at 280ms it jumped a quarter of the way per 60 fps frame. */
 ::view-transition-group(*) {
-  animation-duration: 280ms;
+  animation-duration: 350ms;
   animation-timing-function: var(--ease-ios);
+}
+
+/* An icon's or title's two snapshots swap early on an ease-out, so the old and new weights never ghost for long. */
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: 200ms;
+  animation-timing-function: var(--ease-out);
 }
 
 /* iPhone Safari paints under its bars, beyond what a page snapshot covers; there only icons and titles travel. */

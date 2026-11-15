@@ -363,16 +363,11 @@ const art = cells
       colour = vec4(v_color * coverage * strength, coverage * strength) * fade;
     }`;
 
-  function bindGarland(signal: AbortSignal) {
-    const host = document.querySelector<HTMLElement>("[data-garland]");
+  async function bindGarland(isCurrent: () => boolean) {
+    const host = document.body.querySelector<HTMLElement>("[data-garland]");
     const box = host?.querySelector<HTMLElement>(".garland-art");
     const pre = box?.querySelector("pre");
     if (!host || !box || !pre || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: true, antialias: false });
-    // Without WebGL 2 the static art stays.
-    if (!gl) return;
-    if ("drawingBufferColorSpace" in gl) gl.drawingBufferColorSpace = "display-p3";
     const tones: Tone[] = JSON.parse(host.dataset.tones ?? "[]");
 
     // Read the glyphs back out of the static art.
@@ -380,9 +375,11 @@ const art = cells
     let row = 0;
     let col = 0;
     let cols = 0;
-    for (const node of Array.from(pre.childNodes)) {
+    for (const node of pre.childNodes) {
       const tone = node instanceof HTMLElement ? Number(node.className.slice(1)) : -1;
-      for (const char of node.textContent ?? "") {
+      const text = node.textContent ?? "";
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i]!;
         if (char === "\n") {
           row += 1;
           col = 0;
@@ -399,20 +396,20 @@ const art = cells
     // Find the flowers: connected patches of one hue, non-green. A patch whose bounds sit mostly inside
     // a bigger one's (a flower's centre) joins it. A column's stems and leaves go with the flower that
     // fills most of it; the rest is foliage, which sways with the wave field column by column.
-    const green = (tone: number) => {
-      const [, a = 0, b = 0] = tones[tone] ?? [];
-      return a < -0.03 && b > -0.02;
-    };
-    // Same flower: the same hue (petal outlines are darker but share it), or both near-white.
-    const near = (x: number, y: number) => {
-      const [l1 = 0, a1 = 0, b1 = 0] = tones[x] ?? [];
-      const [l2 = 0, a2 = 0, b2 = 0] = tones[y] ?? [];
-      if (Math.hypot(a1, b1) < 0.025 || Math.hypot(a2, b2) < 0.025) return Math.abs(l1 - l2) < 0.35;
-      const turn = Math.abs(Math.atan2(b1, a1) - Math.atan2(b2, a2));
-      return Math.min(turn, 2 * Math.PI - turn) < 0.6;
-    };
+    const green = tones.map(([, a, b]) => a < -0.03 && b > -0.02);
+    // Same flower: the same hue (petal outlines are darker but share it), or both near-white. Worked out once per
+    // pair of tones, since the flood fill below asks for every neighbour.
+    const sameFlower = new Uint8Array(tones.length * tones.length);
+    tones.forEach(([l1, a1, b1], x) =>
+      tones.forEach(([l2, a2, b2], y) => {
+        const turn = Math.abs(Math.atan2(b1, a1) - Math.atan2(b2, a2));
+        const near =
+          Math.hypot(a1, b1) < 0.025 || Math.hypot(a2, b2) < 0.025 ? Math.abs(l1 - l2) < 0.35 : Math.min(turn, 2 * Math.PI - turn) < 0.6;
+        sameFlower[x * tones.length + y] = near ? 1 : 0;
+      }),
+    );
     const grid = new Map<number, number>();
-    for (const cell of read) if (!green(cell.tone)) grid.set(cell.row * cols + cell.col, cell.tone);
+    for (const cell of read) if (!green[cell.tone]) grid.set(cell.row * cols + cell.col, cell.tone);
     const patchOf = new Map<number, number>();
     const sizes: number[] = [];
     const bounds: number[][] = [];
@@ -428,12 +425,15 @@ const art = cells
         const r = Math.floor(cell / cols);
         const c = cell % cols;
         size += 1;
-        extent.splice(0, 4, Math.min(extent[0]!, r), Math.min(extent[1]!, c), Math.max(extent[2]!, r), Math.max(extent[3]!, c));
+        extent[0] = Math.min(extent[0]!, r);
+        extent[1] = Math.min(extent[1]!, c);
+        extent[2] = Math.max(extent[2]!, r);
+        extent[3] = Math.max(extent[3]!, c);
         for (let dr = -1; dr <= 1; dr++) {
           for (let dc = -1; dc <= 1; dc++) {
             const next = (r + dr) * cols + c + dc;
             const other = grid.get(next);
-            if (other === undefined || patchOf.has(next) || c + dc < 0 || c + dc >= cols || !near(tone, other)) continue;
+            if (other === undefined || patchOf.has(next) || c + dc < 0 || c + dc >= cols || !sameFlower[tone * tones.length + other]) continue;
             patchOf.set(next, id);
             queue.push(next);
           }
@@ -456,10 +456,9 @@ const art = cells
     });
     const total = sizes.map(() => 0);
     sizes.forEach((size, id) => (total[rootOf(id)]! += size));
-    const flowerAt = (cell: number) => {
-      const id = patchOf.get(cell);
-      return id === undefined || total[rootOf(id)]! < 8 ? -1 : rootOf(id);
-    };
+    const flowerOf = new Int32Array(rows * cols).fill(-1);
+    for (const [cell, id] of patchOf) if (total[rootOf(id)]! >= 8) flowerOf[cell] = rootOf(id);
+    const flowerAt = (cell: number) => flowerOf[cell]!;
 
     const indexOf = new Map<number, number>();
     const columnFlower = Array.from({ length: cols }, (_, c) => {
@@ -496,8 +495,9 @@ const art = cells
       cell.tone = left.tone;
     });
     const foliage = read.filter((_, i) => owners[i] === -1);
-    const plants: Plant[] = Array.from({ length: indexOf.size }, (_, index) => {
-      const cells = read.filter((_, i) => owners[i] === index);
+    const plantCells: Cell[][] = Array.from({ length: indexOf.size }, () => []);
+    read.forEach((cell, i) => plantCells[owners[i]!]?.push(cell));
+    const plants: Plant[] = plantCells.map((cells) => {
       const petals = cells.filter((cell) => flowerAt(cell.row * cols + cell.col) >= 0);
       const crown = Math.min(...cells.map((cell) => cell.row));
       const head = petals.length ? Math.max(...petals.map((cell) => cell.row)) : crown;
@@ -578,6 +578,15 @@ const art = cells
     const stateWidth = Math.max(cols, plants.length);
     const stems = new Float32Array(plants.length * rows);
 
+    // Reading the art is one task and the drawing setup another, so neither holds up a tap for long. The canvas goes
+    // in and draws its first frame in the same task, so the static art never gives way to an empty one.
+    await new Promise((resolve) => setTimeout(resolve));
+    if (!isCurrent()) return;
+    const canvas = document.createElement("canvas");
+    const gl = canvas.getContext("webgl2", { alpha: true, premultipliedAlpha: true, antialias: false });
+    // Without WebGL 2 the static art stays.
+    if (!gl) return;
+    if ("drawingBufferColorSpace" in gl) gl.drawingBufferColorSpace = "display-p3";
     canvas.className = "garland-canvas";
     host.append(canvas);
 
@@ -1238,11 +1247,16 @@ const art = cells
     });
     canvas.addEventListener("webglcontextrestored", () => setup());
 
+    // It lives as long as its page: a swap takes it out of the document (on iPhone once the page being left has
+    // faded out), where it would measure nothing, so it lets go there.
+    const life = new AbortController();
+    const { signal } = life;
     for (const type of ["pointermove", "pointerdown", "scroll", "wheel", "keydown", "touchstart"] as const) {
       window.addEventListener(type, stir, { passive: true, signal });
     }
 
     const resize = new ResizeObserver(() => {
+      if (!host.isConnected) return life.abort();
       measure();
       draw(performance.now() / 1000);
       flock();
@@ -1269,17 +1283,13 @@ const art = cells
     host.dataset.live = "";
   }
 
-  let binding: AbortController | undefined;
+  let latest = 0;
   document.addEventListener("astro:page-load", async () => {
-    // The page being left can still be fading out on screen (iPhone), so its garland lets go when the transition ends.
-    const previous = binding;
-    transitionEnd().then(() => previous?.abort());
-    binding = new AbortController();
-    const { signal } = binding;
+    const load = ++latest;
     // WebGL setup stalls the page transition on phones; it waits that out unless in view (the static art is dimmer).
-    const host = document.querySelector("[data-garland]");
+    const host = document.body.querySelector("[data-garland]");
     const inView = !!host && host.getBoundingClientRect().top < innerHeight;
     await Promise.all([document.fonts.ready, inView ? undefined : transitionEnd()]);
-    if (!signal.aborted) bindGarland(signal);
+    if (load === latest) void bindGarland(() => load === latest);
   });
 </script>

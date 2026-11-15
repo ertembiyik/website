@@ -50,6 +50,7 @@ const { width, height } = Astro.props;
             height={height}
             densities={[1, 2, 3]}
             loading={index === 0 ? "eager" : "lazy"}
+            fetchpriority={index === 0 ? undefined : "low"}
             decoding="async"
           />
         ) : (

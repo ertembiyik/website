@@ -1,8 +1,8 @@
 ---
 import "../styles/globals.css";
 import { ClientRouter } from "astro:transitions";
-import interUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
-import geistMonoUrl from "@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2?url";
+import interUrl from "../assets/fonts/inter-latin-wght-400-700.woff2?url";
+import geistMonoUrl from "../assets/fonts/geist-mono-latin-wght-400-700.woff2?url";
 import ogCardUrl from "../assets/og-card.png?url";
 import { profile } from "../data/site";
 
@@ -28,8 +28,8 @@ const markdownHref = notFound ? undefined : `${Astro.url.pathname.replace(/\/?$/
 // Inlined so the fonts start downloading before the stylesheet arrives. font-display: block (with the
 // preloads below) means a new document never paints fallback text and then swaps mid view transition.
 const fontFaces = `
-@font-face{font-family:"Inter Variable";font-style:normal;font-display:block;font-weight:100 900;src:url("${interUrl}") format("woff2")}
-@font-face{font-family:"Geist Mono Variable";font-style:normal;font-display:block;font-weight:100 900;src:url("${geistMonoUrl}") format("woff2")}
+@font-face{font-family:"Inter Variable";font-style:normal;font-display:block;font-weight:400 700;src:url("${interUrl}") format("woff2")}
+@font-face{font-family:"Geist Mono Variable";font-style:normal;font-display:block;font-weight:400 700;src:url("${geistMonoUrl}") format("woff2")}
 `;
 ---
 
@@ -48,7 +48,8 @@ const fontFaces = `
     <link rel="sitemap" href="/sitemap-index.xml" />
     {markdownHref && <link rel="alternate" type="text/markdown" href={markdownHref} />}
     <link rel="preload" href={interUrl} as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href={geistMonoUrl} as="font" type="font/woff2" crossorigin />
+    {/* Mono is below the fold (garland, tooltips), so it gives way to Inter and the first paint. */}
+    <link rel="preload" href={geistMonoUrl} as="font" type="font/woff2" crossorigin fetchpriority="low" />
 
     <title>{pageTitle}</title>
     <meta name="description" content={description} />

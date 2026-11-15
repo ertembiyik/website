@@ -31,7 +31,7 @@ const notes = [
   ...speaking.map((talk) => ({
     title: talk.data.title,
     year: talk.data.year,
-    href: `/speaking/${talk.id}`,
+    href: `/speaking/${talk.id}/`,
     kind: "talk" as const,
     external: false,
   })),
@@ -51,10 +51,10 @@ const notes = [
         </p>
         <p>
           Now founding engineer at{" "}
-          <a class="inline-app" href="/work/pool" data-morph-scope="intro"><AppIcon src={poolIcon} size={18} loading="eager" morph="icon-pool" /><span class="morph" data-morph="title-pool">Pool</span></a>,
+          <a class="inline-app" href="/work/pool/" data-morph-scope="intro"><AppIcon src={poolIcon} size={18} loading="eager" morph="icon-pool" /><span class="morph" data-morph="title-pool">Pool</span></a>,
           the fastest way to save anything with a screenshot. Before that, three
           years at{" "}
-          <a class="inline-app" href="/work/vk" data-morph-scope="intro"><AppIcon src={vkIcon} size={18} loading="eager" morph="icon-vk" /><span class="morph" data-morph="title-vk">VK</span></a>{" "}
+          <a class="inline-app" href="/work/vk/" data-morph-scope="intro"><AppIcon src={vkIcon} size={18} loading="eager" morph="icon-vk" /><span class="morph" data-morph="title-vk">VK</span></a>{" "}
           shipping a superapp to 100M+ people
         </p>
       </div>
@@ -66,7 +66,7 @@ const notes = [
         {
           work.map((item) => (
             <li>
-              <a class="row row-work" href={`/work/${item.id}`} data-morph-scope="row">
+              <a class="row row-work" href={`/work/${item.id}/`} data-morph-scope="row">
                 <span class="row-body">
                   <span class="row-title">
                     {item.data.role} at{" "}
@@ -91,7 +91,7 @@ const notes = [
         {
           projects.map((project) => (
             <li>
-              <a class="row row-project" href={`/projects/${project.id}`} data-morph-scope="row">
+              <a class="row row-project" href={`/projects/${project.id}/`} data-morph-scope="row">
                 <AppIcon src={project.data.icon} size={40} morph={`icon-${project.id}`} />
                 <span class="row-body">
                   <span class="row-title">

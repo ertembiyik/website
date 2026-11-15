@@ -166,6 +166,8 @@ const art = cells
 <style is:inline set:html={css} />
 
 <script>
+  import { transitionEnd } from "../scripts/navigation";
+
   /** OKLab (to find flowers by colour) and the Display P3 colour a tone draws with. */
   type Tone = [number, number, number, number, number, number];
   type Cell = { char: string; col: number; row: number; tone: number };
@@ -1272,7 +1274,10 @@ const art = cells
     binding?.abort();
     binding = new AbortController();
     const { signal } = binding;
-    await document.fonts.ready;
+    // WebGL setup stalls the page transition on phones; it waits that out unless in view (the static art is dimmer).
+    const host = document.querySelector("[data-garland]");
+    const inView = !!host && host.getBoundingClientRect().top < innerHeight;
+    await Promise.all([document.fonts.ready, inView ? undefined : transitionEnd()]);
     if (!signal.aborted) bindGarland(signal);
   });
 </script>

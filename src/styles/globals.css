@@ -18,6 +18,7 @@
 
   --ease-out: cubic-bezier(0.165, 0.84, 0.44, 1);
   --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1); /* the iOS navigation curve */
 }
 
 @media (min-resolution: 2dppx) {
@@ -857,21 +858,31 @@ html[data-intro] .reveal {
 
 /* ---- View transitions --------------------------------------------------- */
 
-/* The outgoing page leaves faster than the incoming one arrives, so the two
-   never read as a flash of two overlapping documents. */
-::view-transition-old(root) {
-  animation-duration: 140ms;
-  animation-timing-function: ease;
-}
-
+/* One curve for both pages, so together they always add up to a whole page: no dip to black. */
+::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 240ms;
   animation-timing-function: var(--ease-out);
 }
 
+/* The iOS drawer curve front-loads travel: at 280ms it jumped a quarter of the way per 60 fps frame. */
 ::view-transition-group(*) {
-  animation-duration: 280ms;
+  animation-duration: 350ms;
+  animation-timing-function: var(--ease-ios);
+}
+
+/* An icon's or title's two snapshots swap early on an ease-out, so the old and new weights never ghost for long. */
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: 200ms;
   animation-timing-function: var(--ease-out);
+}
+
+/* iPhone Safari paints under its bars, beyond what a page snapshot covers; there only icons and titles travel. */
+@supports (-webkit-touch-callout: none) {
+  :root {
+    view-transition-name: none;
+  }
 }
 
 /* ---- Small screens ------------------------------------------------------ */
@@ -901,11 +912,13 @@ html[data-intro] .reveal {
   .pile-card,
   .tile .squircle,
   .tile-name,
-  .skip-link,
-
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
+  .skip-link {
     animation: none;
+  }
+
+  /* Pages cross-fade whole and nothing travels; !important beats the names set inline. */
+  .morph,
+  .squircle {
+    view-transition-name: none !important;
   }
 }

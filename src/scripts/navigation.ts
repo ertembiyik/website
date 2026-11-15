@@ -8,12 +8,12 @@ let used: { path: string; scope: string | undefined } | undefined;
 let leaving = "";
 
 function linkTo(to: string) {
-  const links = [...document.querySelectorAll<HTMLAnchorElement>("a[data-morph-scope]")].filter((link) => path(link) === to);
+  const links = [...document.body.querySelectorAll<HTMLAnchorElement>("a[data-morph-scope]")].filter((link) => path(link) === to);
   return links.find((link) => used?.path === to && link.dataset.morphScope === used.scope) ?? links.at(-1);
 }
 
 function nameOnly(link: HTMLAnchorElement | undefined) {
-  for (const el of document.querySelectorAll<HTMLElement>("[data-morph]")) {
+  for (const el of document.body.querySelectorAll<HTMLElement>("[data-morph]")) {
     el.style.viewTransitionName = link?.contains(el) ? (el.dataset.morph ?? "") : "";
   }
 }
@@ -26,9 +26,46 @@ document.addEventListener("astro:before-preparation", (event) => {
   nameOnly(link);
 });
 
+// iPhone Safari paints the page under its status bar and toolbar, beyond what a page snapshot covers, so there the
+// root takes no snapshot (globals.css) and the live pages cross-fade: the one being left stays on screen above the
+// new one and fades out as the new one fades in (`.page-leaving` and `.page-arriving` in globals.css).
+const liveFade = CSS.supports("-webkit-touch-callout", "none");
+let leavingPage: { element: HTMLElement; scroll: number } | undefined;
+
+function keepLeavingPage() {
+  const element = document.createElement("div");
+  element.className = "page-leaving";
+  element.inert = true;
+  // Its icon and title travel as snapshots; the copies left behind would show twice and clash by name.
+  for (const el of document.body.querySelectorAll<HTMLElement>("[data-morph], .morph, .squircle")) {
+    if (!el.style.viewTransitionName) continue;
+    el.style.viewTransitionName = "";
+    el.style.visibility = "hidden";
+  }
+  element.append(...document.body.childNodes);
+  document.documentElement.append(element);
+  leavingPage = { element, scroll: scrollY };
+}
+
+function crossFade({ element, scroll }: NonNullable<typeof leavingPage>) {
+  // Stays where it was on screen while the router scrolls the new page into place.
+  element.style.top = `${scrollY - scroll}px`;
+  element.addEventListener("animationend", () => element.remove(), { once: true });
+  element.classList.add("is-fading");
+  const { body } = document;
+  body.classList.add("page-arriving");
+  body.addEventListener("animationend", function settle(event) {
+    if (event.target !== body) return;
+    body.classList.remove("page-arriving");
+    body.removeEventListener("animationend", settle);
+  });
+}
+
 document.addEventListener("astro:after-swap", () => {
+  if (leavingPage) crossFade(leavingPage);
+  leavingPage = undefined;
   // Icons load lazily on a full load; after a swap they are cached, and lazy loading would paint them frames late.
-  for (const img of document.querySelectorAll<HTMLImageElement>(".squircle img")) {
+  for (const img of document.body.querySelectorAll<HTMLImageElement>(".squircle img")) {
     img.loading = "eager";
     img.decoding = "sync";
   }
@@ -121,7 +158,7 @@ const saveData = () =>
 document.addEventListener("astro:page-load", () => {
   visible.disconnect();
   if (saveData() || !navigator.onLine) return;
-  for (const link of document.querySelectorAll<HTMLAnchorElement>("a[href^='/']")) {
+  for (const link of document.body.querySelectorAll<HTMLAnchorElement>("a[href^='/']")) {
     if (link.pathname !== location.pathname) visible.observe(link);
   }
 });
@@ -131,6 +168,7 @@ let finished: Promise<unknown> = Promise.resolve();
 document.addEventListener("astro:before-swap", (event) => {
   finished = event.viewTransition.finished.catch(() => {});
   composite(event.viewTransition);
+  if (liveFade) keepLeavingPage();
 });
 
 /** Resolves when the current page's view transition has finished, at once after a full load. */

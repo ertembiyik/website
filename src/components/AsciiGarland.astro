@@ -1271,7 +1271,9 @@ const art = cells
 
   let binding: AbortController | undefined;
   document.addEventListener("astro:page-load", async () => {
-    binding?.abort();
+    // The page being left can still be fading out on screen (iPhone), so its garland lets go when the transition ends.
+    const previous = binding;
+    transitionEnd().then(() => previous?.abort());
     binding = new AbortController();
     const { signal } = binding;
     // WebGL setup stalls the page transition on phones; it waits that out unless in view (the static art is dimmer).

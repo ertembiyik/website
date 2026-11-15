@@ -19,6 +19,7 @@
   --ease-out: cubic-bezier(0.165, 0.84, 0.44, 1);
   --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1); /* the iOS navigation curve */
+  --page-fade: 240ms;
 }
 
 @media (min-resolution: 2dppx) {
@@ -48,10 +49,12 @@ html {
      left its box taller and wider than the flowers drawn into it. Safari reads only the prefixed property, and the CSS
      minifier drops a prefixed declaration that sits beside its unprefixed twin, so it stands alone. */
   -webkit-text-size-adjust: 100%;
+  /* No grey flash over a tapped link; every link has its own pressed state instead. */
+  -webkit-tap-highlight-color: transparent;
 }
 
-body {
-  min-height: 100dvh;
+body,
+.page-leaving {
   /* The full-bleed garland is 100vw wide, which includes a classic scrollbar's gutter. */
   overflow-x: clip;
   font-family: var(--font-sans);
@@ -60,8 +63,12 @@ body {
   line-height: 1.6;
   letter-spacing: -0.006em;
   color: var(--text);
-  background: var(--bg);
   font-feature-settings: "cv11", "ss03";
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--bg);
 }
 
 img,
@@ -243,7 +250,6 @@ h3 {
   height: var(--h);
   margin-block: 0.25rem 0.75rem;
   user-select: none;
-  -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   touch-action: pan-y; /* sideways swipes flip the cards, vertical ones still scroll */
 }
@@ -499,7 +505,6 @@ h3 {
   container-type: inline-size;
   user-select: none;
   touch-action: pan-y;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .garland-art {
@@ -801,8 +806,22 @@ h3 {
   }
 }
 
-.row:active {
+.row:active,
+.back:active {
   background: var(--pressed);
+}
+
+.back:active,
+.site-footer .label a:active {
+  color: var(--text);
+}
+
+.inline-app:active {
+  color: var(--text-2);
+}
+
+.prose :where(a):active {
+  text-decoration-color: currentColor;
 }
 
 /* ---- Intro reveal (once per session, see Layout.astro) ----------------- */
@@ -825,7 +844,7 @@ html[data-intro] .reveal {
 /* One curve for both pages, so together they always add up to a whole page: no dip to black. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 240ms;
+  animation-duration: var(--page-fade);
   animation-timing-function: var(--ease-out);
 }
 
@@ -842,10 +861,39 @@ html[data-intro] .reveal {
   animation-timing-function: var(--ease-out);
 }
 
-/* iPhone Safari paints under its bars, beyond what a page snapshot covers; there only icons and titles travel. */
+/* iPhone Safari paints under its bars, beyond what a page snapshot covers, so there the live pages cross-fade
+   instead (navigation.ts) and only icons and titles are snapshots. */
 @supports (-webkit-touch-callout: none) {
   :root {
     view-transition-name: none;
+  }
+}
+
+/* The page being left: absolute rather than fixed so it also paints under Safari's bars. */
+.page-leaving {
+  position: absolute;
+  z-index: 1;
+  inset-inline: 0;
+  pointer-events: none;
+}
+
+.page-leaving.is-fading {
+  animation: page-out var(--page-fade) var(--ease-out) forwards;
+}
+
+.page-arriving {
+  animation: page-in var(--page-fade) var(--ease-out);
+}
+
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
   }
 }
 

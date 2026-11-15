@@ -160,7 +160,7 @@ const art = cells
 
 <div class="garland" aria-hidden="true" data-garland data-tones={toneData}>
   <div class="garland-art" style={{ "--cols": cols }}>
-    <pre set:html={art} />
+    <pre inert set:html={art} />
   </div>
 </div>
 <style is:inline set:html={css} />
@@ -1284,11 +1284,31 @@ const art = cells
   }
 
   let latest = 0;
+  let approach: IntersectionObserver | undefined;
+  /** Resolves once `element` comes within half a window of the viewport; a newer page load drops the wait. */
+  const near = (element: Element) =>
+    new Promise<void>((resolve) => {
+      approach?.disconnect();
+      approach = new IntersectionObserver(
+        ([entry]) => {
+          if (!entry?.isIntersecting) return;
+          approach?.disconnect();
+          resolve();
+        },
+        { rootMargin: "50% 0px" },
+      );
+      approach.observe(element);
+    });
+
   document.addEventListener("astro:page-load", async () => {
     const load = ++latest;
-    // WebGL setup stalls the page transition on phones; it waits that out unless in view (the static art is dimmer).
     const host = document.body.querySelector("[data-garland]");
-    const inView = !!host && host.getBoundingClientRect().top < innerHeight;
+    if (!host) return approach?.disconnect();
+    // WebGL setup is the page's heaviest work (over a second where WebGL runs in software, as in Lighthouse), so it
+    // waits until the garland is about to scroll into view; the static art stands in until then.
+    await near(host);
+    // It also stalls the page transition on phones, so it waits that out unless in view (the static art is dimmer).
+    const inView = host.getBoundingClientRect().top < innerHeight;
     await Promise.all([document.fonts.ready, inView ? undefined : transitionEnd()]);
     if (load === latest) void bindGarland(() => load === latest);
   });

@@ -4,7 +4,7 @@ import type { ConnectLink } from "../data/site";
 /** A monochrome squircle tile linking out, with its name in a tooltip. Takes a glyph path or a short wordmark. */
 type Props = ConnectLink & { size: number };
 
-const { label, size, href, scale = 1 } = Astro.props;
+const { label, spoken = label, size, href, scale = 1 } = Astro.props;
 // Stroked glyphs (Heroicons) are drawn at a weight that matches the filled brand marks.
 const glyph = "glyph" in Astro.props ? { d: Astro.props.glyph, stroke: Astro.props.stroke === true } : undefined;
 const text = "text" in Astro.props ? Astro.props.text : undefined;
@@ -16,7 +16,7 @@ const external = href.startsWith("http");
   href={href}
   target={external ? "_blank" : undefined}
   rel={external ? "noopener" : undefined}
-  aria-label={label}
+  aria-label={spoken}
   title={label}
 >
   <span class="squircle squircle-glyph" style={{ "--size": `${size}px`, "--glyph-scale": scale }} aria-hidden="true">

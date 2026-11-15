@@ -18,18 +18,18 @@
   },
   "dependencies": {
     "@astrojs/sitemap": "3.7.4",
-    "astro": "7.3.2"
+    "astro": "7.4.7"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@eslint/js": "^10.0.1",
-    "@types/bun": "^1.4.2",
-    "@typescript-eslint/parser": "^8.58.2",
-    "eslint": "^10.2.0",
-    "eslint-plugin-astro": "^1.7.0",
+    "@types/bun": "^1.4.4",
+    "@typescript-eslint/parser": "^8.72.1",
+    "eslint": "^10.14.0",
+    "eslint-plugin-astro": "^3.2.1",
     "sharp": "0.35.4",
-    "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.2",
-    "wrangler": "4.158.0"
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "wrangler": "4.162.0"
   }
 }

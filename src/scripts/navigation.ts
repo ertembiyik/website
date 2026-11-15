@@ -2,36 +2,90 @@
 
 const path = (location: URL | HTMLAnchorElement) => location.pathname.replace(/\/$/, "");
 
-// The index links one entry from several places, so names go only to the link used, and back to it on return.
+// The index links one entry from several places, so names go to exactly one link per navigation: the one used,
+// else the one last used for that page, else its row. A navigation from anything else clears them.
 let used: { path: string; scope: string | undefined } | undefined;
 let leaving = "";
 
+function linkTo(to: string) {
+  const links = [...document.body.querySelectorAll<HTMLAnchorElement>("a[data-morph-scope]")].filter((link) => path(link) === to);
+  return links.find((link) => used?.path === to && link.dataset.morphScope === used.scope) ?? links.at(-1);
+}
+
 function nameOnly(link: HTMLAnchorElement | undefined) {
-  for (const el of document.querySelectorAll<HTMLElement>("[data-morph]")) {
+  for (const el of document.body.querySelectorAll<HTMLElement>("[data-morph]")) {
     el.style.viewTransitionName = link?.contains(el) ? (el.dataset.morph ?? "") : "";
   }
 }
 
 document.addEventListener("astro:before-preparation", (event) => {
   leaving = path(event.from);
-  const link = event.sourceElement?.closest("a[data-morph-scope]");
-  if (!(link instanceof HTMLAnchorElement)) return;
-  used = { path: path(link), scope: link.dataset.morphScope };
+  const clicked = event.sourceElement?.closest("a[data-morph-scope]");
+  const link = clicked instanceof HTMLAnchorElement ? clicked : linkTo(path(event.to));
+  if (link) used = { path: path(link), scope: link.dataset.morphScope };
   nameOnly(link);
 });
 
+// iPhone Safari paints the page under its status bar and toolbar, beyond what a page snapshot covers, so there the
+// root takes no snapshot (globals.css) and the live pages cross-fade: the one being left stays on screen above the
+// new one and fades out as the new one fades in (`.page-leaving` and `.page-arriving` in globals.css).
+const liveFade = CSS.supports("-webkit-touch-callout", "none");
+let leavingPage: { element: HTMLElement; scroll: number } | undefined;
+
+function keepLeavingPage() {
+  const element = document.createElement("div");
+  element.className = "page-leaving";
+  element.inert = true;
+  // Its icon and title travel as snapshots; the copies left behind would show twice and clash by name.
+  for (const el of document.body.querySelectorAll<HTMLElement>("[data-morph], .morph, .squircle")) {
+    if (!el.style.viewTransitionName) continue;
+    el.style.viewTransitionName = "";
+    el.style.visibility = "hidden";
+  }
+  element.append(...document.body.childNodes);
+  document.documentElement.append(element);
+  leavingPage = { element, scroll: scrollY };
+}
+
+function crossFade({ element, scroll }: NonNullable<typeof leavingPage>) {
+  // Stays where it was on screen while the router scrolls the new page into place.
+  element.style.top = `${scrollY - scroll}px`;
+  element.addEventListener("animationend", () => element.remove(), { once: true });
+  element.classList.add("is-fading");
+  const { body } = document;
+  body.classList.add("page-arriving");
+  body.addEventListener("animationend", function settle(event) {
+    if (event.target !== body) return;
+    body.classList.remove("page-arriving");
+    body.removeEventListener("animationend", settle);
+  });
+}
+
 document.addEventListener("astro:after-swap", () => {
+  if (leavingPage) crossFade(leavingPage);
+  leavingPage = undefined;
   // Icons load lazily on a full load; after a swap they are cached, and lazy loading would paint them frames late.
-  for (const img of document.querySelectorAll<HTMLImageElement>(".squircle img")) {
+  for (const img of document.body.querySelectorAll<HTMLImageElement>(".squircle img")) {
     img.loading = "eager";
     img.decoding = "sync";
   }
-  const links = [...document.querySelectorAll<HTMLAnchorElement>("a[data-morph-scope]")].filter(
-    (link) => path(link) === leaving,
-  );
-  if (links.length === 0) return;
-  nameOnly(links.find((link) => used?.path === leaving && link.dataset.morphScope === used.scope) ?? links.at(-1));
+  nameOnly(linkTo(leaving));
 });
+
+// A detail page's back link goes back in history, keeping the index's scroll, when the reader came from within
+// the site; a direct visitor just goes home. The router keeps its own position as history.state.index.
+document.addEventListener(
+  "click",
+  (event) => {
+    const back = event.target instanceof Element ? event.target.closest("a[data-back]") : null;
+    if (!back || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const index: unknown = history.state?.index;
+    if (typeof index !== "number" || index === 0) return;
+    event.preventDefault();
+    history.back();
+  },
+  { capture: true },
+);
 
 // Browsers morph a group's width and height on the main thread (60 fps cap on iPhone); a scale draws the same frames on the compositor.
 const fromTopLeft = (transform: string, width: number, height: number) =>
@@ -103,8 +157,8 @@ const saveData = () =>
 
 document.addEventListener("astro:page-load", () => {
   visible.disconnect();
-  if (saveData()) return;
-  for (const link of document.querySelectorAll<HTMLAnchorElement>("a[href^='/']")) {
+  if (saveData() || !navigator.onLine) return;
+  for (const link of document.body.querySelectorAll<HTMLAnchorElement>("a[href^='/']")) {
     if (link.pathname !== location.pathname) visible.observe(link);
   }
 });
@@ -114,6 +168,7 @@ let finished: Promise<unknown> = Promise.resolve();
 document.addEventListener("astro:before-swap", (event) => {
   finished = event.viewTransition.finished.catch(() => {});
   composite(event.viewTransition);
+  if (liveFade) keepLeavingPage();
 });
 
 /** Resolves when the current page's view transition has finished, at once after a full load. */

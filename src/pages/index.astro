@@ -1,16 +1,11 @@
 ---
-import { getCollection } from "astro:content";
 import AppIcon from "../components/AppIcon.astro";
 import AsciiGarland from "../components/AsciiGarland.astro";
 import IconTile from "../components/IconTile.astro";
 import Layout from "../layouts/Layout.astro";
 import PhotoStack from "../components/PhotoStack.astro";
-import poolIcon from "../assets/icons/pool.png";
-import vkIcon from "../assets/icons/vk.png";
-import { connect, links, profile, writing } from "../data/site";
-
-const byOrder = <T extends { data: { order: number } }>(a: T, b: T) =>
-  a.data.order - b.data.order;
+import { entryUrl, introParagraphs, loadEntries, workEntry } from "../data/entries";
+import { connect, current, links, profile, writing } from "../data/site";
 
 // "Feb 2026 – now" → "2026 – now"; "Aug 2022 – Nov 2025" → "2022 – 2025"; "Feb 2022 – Jul 2022" → "2022".
 // Full periods live on detail pages.
@@ -19,44 +14,52 @@ const years = (period: string) => {
   return [...new Set(parts)].join(" – ");
 };
 
-const [work, projects, speaking] = await Promise.all([
-  getCollection("work").then((list) => list.sort(byOrder)),
-  getCollection("projects").then((list) => list.sort(byOrder)),
-  getCollection("speaking").then((list) => list.sort(byOrder)),
+const [{ work, projects, speaking }, intro, job] = await Promise.all([
+  loadEntries(),
+  introParagraphs(),
+  workEntry(current.work),
 ]);
 
-// Writing and talks share one list, newest first.
+// Writing and talks share one list, newest first. Talks are pages here; writing lives elsewhere.
 const notes = [
-  ...writing.map((item) => ({ ...item, kind: "writing" as const, external: true })),
-  ...speaking.map((talk) => ({
-    title: talk.data.title,
-    year: talk.data.year,
-    href: `/speaking/${talk.id}/`,
-    kind: "talk" as const,
-    external: false,
-  })),
+  ...writing.map(({ title, year, href }) => ({ title, year, href, talk: false })),
+  ...speaking.map((talk) => ({ title: talk.data.title, year: talk.data.year, href: entryUrl(talk), talk: true })),
 ].sort((a, b) => b.year.localeCompare(a.year));
+
+const person = {
+  "@context": "https://schema.org",
+  "@type": "Person",
+  name: profile.name,
+  url: Astro.site?.href,
+  email: `mailto:${profile.email}`,
+  jobTitle: job.data.role,
+  worksFor: { "@type": "Organization", name: job.data.title, url: job.data.links[0].url },
+  sameAs: [links.x, links.github, links.linkedin, links.telegram],
+};
 ---
 
-<Layout title={profile.name} home>
+<Layout title={profile.name} home jsonLd={person}>
   <main id="content" class="frame home">
     <header class="hero reveal" style="--i: 0">
       <PhotoStack width={96} height={120} />
       <h1>{profile.name}</h1>
       <div class="hero-copy">
-        <p>
-          Hi, I’m Ertem. I make apps for Apple platforms. Sometimes poke at what’s
-          underneath them. In my free time I build consumer + AI side projects
-          with friends, skate, play tennis, and nerd out on X
-        </p>
-        <p>
-          Now founding engineer at{" "}
-          <a class="inline-app" href="/work/pool/" data-morph-scope="intro"><AppIcon src={poolIcon} size={18} loading="eager" morph="icon-pool" /><span class="morph" data-morph="title-pool">Pool</span></a>,
-          the fastest way to save anything with a screenshot. Before that, three
-          years at{" "}
-          <a class="inline-app" href="/work/vk/" data-morph-scope="intro"><AppIcon src={vkIcon} size={18} loading="eager" morph="icon-vk" /><span class="morph" data-morph="title-vk">VK</span></a>{" "}
-          shipping a superapp to 100M+ people
-        </p>
+        {
+          intro.map((paragraph) => (
+            <p>
+              {paragraph.map((part) =>
+                typeof part === "string" ? (
+                  part
+                ) : (
+                  <a class="inline-app" href={entryUrl(part)} data-morph-scope="intro">
+                    {part.data.icon && <AppIcon src={part.data.icon} size={18} loading="eager" morph={`icon-${part.id}`} />}
+                    <span class="morph" data-morph={`title-${part.id}`}>{part.data.title}</span>
+                  </a>
+                ),
+              )}
+            </p>
+          ))
+        }
       </div>
     </header>
 
@@ -66,7 +69,7 @@ const notes = [
         {
           work.map((item) => (
             <li>
-              <a class="row row-work" href={`/work/${item.id}/`} data-morph-scope="row">
+              <a class="row row-work" href={entryUrl(item)} data-morph-scope="row">
                 <span class="row-body">
                   <span class="row-title">
                     {item.data.role} at{" "}
@@ -91,7 +94,7 @@ const notes = [
         {
           projects.map((project) => (
             <li>
-              <a class="row row-project" href={`/projects/${project.id}/`} data-morph-scope="row">
+              <a class="row row-project" href={entryUrl(project)} data-morph-scope="row">
                 <AppIcon src={project.data.icon} size={40} morph={`icon-${project.id}`} />
                 <span class="row-body">
                   <span class="row-title">
@@ -116,15 +119,15 @@ const notes = [
               <a
                 class="row row-note"
                 href={note.href}
-                target={note.external ? "_blank" : undefined}
-                rel={note.external ? "noopener" : undefined}
+                target={note.talk ? undefined : "_blank"}
+                rel={note.talk ? undefined : "noopener"}
               >
                 <span class="row-title">{note.title}</span>
                 <span class="row-end">
-                  {note.kind === "talk" && <span class="tag">talk</span>}
+                  {note.talk && <span class="tag">talk</span>}
                   <span class="row-date">{note.year}</span>
-                  <span class:list={["arrow", { "arrow-internal": !note.external }]} aria-hidden="true">
-                    {note.external ? "↗" : "→"}
+                  <span class:list={["arrow", { "arrow-internal": note.talk }]} aria-hidden="true">
+                    {note.talk ? "→" : "↗"}
                   </span>
                 </span>
               </a>
@@ -139,11 +142,7 @@ const notes = [
       <ul class="tiles" aria-label="Ways to reach me">
         {connect.map((item) => (
           <li>
-            {"text" in item ? (
-              <IconTile text={item.text} label={item.label} size={36} href={item.href} />
-            ) : (
-              <IconTile glyph={item.glyph} stroke={item.stroke} label={item.label} size={36} href={item.href} scale={item.scale} />
-            )}
+            <IconTile {...item} size={40} />
           </li>
         ))}
       </ul>

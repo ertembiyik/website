@@ -1,41 +1,20 @@
 ---
-import type { GetStaticPaths, InferGetStaticPropsType } from "astro";
-import { getCollection, render } from "astro:content";
+import type { InferGetStaticPropsType } from "astro";
+import { render } from "astro:content";
 import { Image } from "astro:assets";
 import AppIcon from "../../components/AppIcon.astro";
 import Layout from "../../layouts/Layout.astro";
 import portrait from "../../assets/me/01-ertem.jpg";
+import { entryPaths, metaLine } from "../../data/entries";
 import { profile } from "../../data/site";
 
-export const getStaticPaths = (async () => {
-  const [work, projects, speaking] = await Promise.all([
-    getCollection("work"),
-    getCollection("projects"),
-    getCollection("speaking"),
-  ]);
-
-  return [
-    ...work.map((entry) => ({ category: "work" as const, entry })),
-    ...projects.map((entry) => ({ category: "projects" as const, entry })),
-    ...speaking.map((entry) => ({ category: "speaking" as const, entry })),
-  ].map(({ category, entry }) => ({
-    params: { category, slug: entry.id },
-    props: { category, entry },
-  }));
-}) satisfies GetStaticPaths;
+export const getStaticPaths = entryPaths;
 
 type Props = InferGetStaticPropsType<typeof getStaticPaths>;
 
 const { entry } = Astro.props;
 const { Content } = await render(entry);
-
-const meta =
-  "period" in entry.data
-    ? `${entry.data.role} · ${entry.data.period}`
-    : "event" in entry.data
-      ? `${entry.data.event} · ${entry.data.year}`
-      : entry.data.year;
-
+const meta = metaLine(entry);
 const [primary, ...secondary] = entry.data.links;
 ---
 
@@ -108,17 +87,3 @@ const [primary, ...secondary] = entry.data.links;
   </main>
 </Layout>
 
-<script>
-  // Go back (scroll position intact) when the reader navigated here within the site; a direct
-  // visitor just goes home. The client router records its position as history.state.index.
-  function bindBack() {
-    const back = document.querySelector<HTMLAnchorElement>("[data-back]");
-    back?.addEventListener("click", (event) => {
-      if (typeof history.state?.index === "number" && history.state.index > 0) {
-        event.preventDefault();
-        history.back();
-      }
-    });
-  }
-  document.addEventListener("astro:page-load", bindBack);
-</script>

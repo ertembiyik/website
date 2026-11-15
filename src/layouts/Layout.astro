@@ -1,43 +1,35 @@
 ---
 import "../styles/globals.css";
 import { ClientRouter } from "astro:transitions";
-import interUrl from "@fontsource-variable/inter/files/inter-latin-wght-normal.woff2?url";
-import geistMonoUrl from "@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2?url";
+import interUrl from "../assets/fonts/inter-latin-wght-400-700.woff2?url";
+import geistMonoUrl from "../assets/fonts/geist-mono-latin-wght-400-700.woff2?url";
 import ogCardUrl from "../assets/og-card.png?url";
-import { links, profile } from "../data/site";
+import { profile } from "../data/site";
 
 interface Props {
   title: string;
   description?: string;
   home?: boolean;
+  /** schema.org data for the page, rendered as JSON-LD. */
+  jsonLd?: Record<string, unknown>;
+  /** The 404 page: no canonical URL, no Markdown twin, not indexed. */
+  notFound?: boolean;
 }
 
-const { title, description = profile.description, home = false } = Astro.props;
-const canonical = new URL(Astro.url.pathname, Astro.site);
+const { title, description = profile.description, home = false, jsonLd, notFound = false } = Astro.props;
+const canonical = notFound ? undefined : new URL(Astro.url.pathname, Astro.site);
 // Hashed, so a new card reaches link previews that cached the old one.
 const socialImage = new URL(ogCardUrl, Astro.site);
 const pageTitle = home ? title : `${title} · ${profile.name}`;
 
 // Every page except the 404 has a Markdown twin for agents (see src/data/markdown.ts).
-const isNotFound = Astro.url.pathname.replace(/\/$/, "") === "/404";
-const markdownHref = isNotFound ? undefined : `${Astro.url.pathname.replace(/\/?$/, "/")}index.md`;
-
-const person = {
-  "@context": "https://schema.org",
-  "@type": "Person",
-  name: profile.name,
-  url: Astro.site?.href,
-  email: `mailto:${profile.email}`,
-  jobTitle: "Founding engineer",
-  worksFor: { "@type": "Organization", name: "Pool", url: "https://pool.day" },
-  sameAs: [links.x, links.github, links.linkedin, links.telegram],
-};
+const markdownHref = notFound ? undefined : `${Astro.url.pathname.replace(/\/?$/, "/")}index.md`;
 
 // Inlined so the fonts start downloading before the stylesheet arrives. font-display: block (with the
 // preloads below) means a new document never paints fallback text and then swaps mid view transition.
 const fontFaces = `
-@font-face{font-family:"Inter Variable";font-style:normal;font-display:block;font-weight:100 900;src:url("${interUrl}") format("woff2")}
-@font-face{font-family:"Geist Mono Variable";font-style:normal;font-display:block;font-weight:100 900;src:url("${geistMonoUrl}") format("woff2")}
+@font-face{font-family:"Inter Variable";font-style:normal;font-display:block;font-weight:400 700;src:url("${interUrl}") format("woff2")}
+@font-face{font-family:"Geist Mono Variable";font-style:normal;font-display:block;font-weight:400 700;src:url("${geistMonoUrl}") format("woff2")}
 `;
 ---
 
@@ -52,17 +44,18 @@ const fontFaces = `
     <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
     <link rel="icon" type="image/png" href="/favicon.png" sizes="96x96" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="canonical" href={canonical} />
+    {canonical ? <link rel="canonical" href={canonical} /> : <meta name="robots" content="noindex" />}
     <link rel="sitemap" href="/sitemap-index.xml" />
     {markdownHref && <link rel="alternate" type="text/markdown" href={markdownHref} />}
     <link rel="preload" href={interUrl} as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href={geistMonoUrl} as="font" type="font/woff2" crossorigin />
+    {/* Mono is below the fold (garland, tooltips), so it gives way to Inter and the first paint. */}
+    <link rel="preload" href={geistMonoUrl} as="font" type="font/woff2" crossorigin fetchpriority="low" />
 
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
 
     <meta property="og:type" content="website" />
-    <meta property="og:url" content={canonical} />
+    {canonical && <meta property="og:url" content={canonical} />}
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={description} />
     <meta property="og:site_name" content={profile.name} />
@@ -75,7 +68,7 @@ const fontFaces = `
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={socialImage} />
 
-    {home && <script is:inline type="application/ld+json" set:html={JSON.stringify(person)} />}
+    {jsonLd && <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
 
     <style is:inline set:html={fontFaces}></style>
     {/* Same-document navigation: the next page is fetched and swapped in place, so the view

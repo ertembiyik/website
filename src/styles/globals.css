@@ -19,6 +19,7 @@
   --ease-out: cubic-bezier(0.165, 0.84, 0.44, 1);
   --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
   --ease-ios: cubic-bezier(0.32, 0.72, 0, 1); /* the iOS navigation curve */
+  --page-fade: 240ms;
 }
 
 @media (min-resolution: 2dppx) {
@@ -48,10 +49,12 @@ html {
      left its box taller and wider than the flowers drawn into it. Safari reads only the prefixed property, and the CSS
      minifier drops a prefixed declaration that sits beside its unprefixed twin, so it stands alone. */
   -webkit-text-size-adjust: 100%;
+  /* No grey flash over a tapped link; every link has its own pressed state instead. */
+  -webkit-tap-highlight-color: transparent;
 }
 
-body {
-  min-height: 100dvh;
+body,
+.page-leaving {
   /* The full-bleed garland is 100vw wide, which includes a classic scrollbar's gutter. */
   overflow-x: clip;
   font-family: var(--font-sans);
@@ -60,8 +63,12 @@ body {
   line-height: 1.6;
   letter-spacing: -0.006em;
   color: var(--text);
-  background: var(--bg);
   font-feature-settings: "cv11", "ss03";
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--bg);
 }
 
 img,
@@ -72,16 +79,6 @@ svg {
 
 a {
   color: inherit;
-  touch-action: manipulation;
-}
-
-button {
-  font: inherit;
-  color: inherit;
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
   touch-action: manipulation;
 }
 
@@ -174,18 +171,6 @@ h3 {
   color: var(--text);
 }
 
-.section > p {
-  color: var(--text-2);
-}
-
-.section > p a {
-  color: var(--text);
-  text-decoration: underline;
-  text-decoration-color: var(--text-3);
-  text-underline-offset: 0.2em;
-  transition: text-decoration-color 150ms ease;
-}
-
 /* ---- Apple squircle ----------------------------------------------------- */
 
 /* The iOS icon outline as a mask, so every browser clips to the exact same shape. */
@@ -208,23 +193,20 @@ h3 {
   object-fit: cover;
 }
 
+/* Wordmark tiles ("Cal") are set bold and tight, sized to the tile like the glyphs. */
 .squircle-glyph {
   align-items: center;
   justify-content: center;
   color: var(--text);
+  font-size: calc(var(--size) * 0.4);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
 }
 
 .squircle-glyph svg {
   width: calc(50% * var(--glyph-scale, 1));
   height: calc(50% * var(--glyph-scale, 1));
-}
-
-/* Wordmark tiles ("Cal"): bold, tight, sized to the tile like the glyphs. */
-.squircle-glyph {
-  font-size: calc(var(--size) * 0.4);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1;
 }
 
 /* ---- Hero --------------------------------------------------------------- */
@@ -257,10 +239,6 @@ h3 {
   transition: color 150ms ease;
 }
 
-.inline-app .squircle {
-  --size: 18px;
-}
-
 /* ---- Photo pile --------------------------------------------------------- */
 
 .pile {
@@ -272,7 +250,6 @@ h3 {
   height: var(--h);
   margin-block: 0.25rem 0.75rem;
   user-select: none;
-  -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   touch-action: pan-y; /* sideways swipes flip the cards, vertical ones still scroll */
 }
@@ -323,7 +300,7 @@ h3 {
   pointer-events: none;
 }
 
-/* ---- Icon tiles (stack, connect) ---------------------------------------- */
+/* ---- Icon tiles (connect) ----------------------------------------------- */
 
 .tiles {
   list-style: none;
@@ -334,7 +311,6 @@ h3 {
 }
 
 .tile {
-  --size: 36px;
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -425,10 +401,6 @@ h3 {
   align-items: center;
   gap: 0.3em;
   font-weight: 500;
-}
-
-.row-title .squircle {
-  --size: 18px;
 }
 
 .row-summary {
@@ -533,7 +505,6 @@ h3 {
   container-type: inline-size;
   user-select: none;
   touch-action: pan-y;
-  -webkit-tap-highlight-color: transparent;
 }
 
 .garland-art {
@@ -812,7 +783,6 @@ h3 {
     transform: translate(-50%, -2px);
   }
 
-  .inline-app:hover,
   .site-footer .label a:hover,
   .back:hover {
     color: var(--text);
@@ -831,14 +801,27 @@ h3 {
     color: var(--text-2);
   }
 
-  .section > p a:hover,
   .prose :where(a):hover {
     text-decoration-color: currentColor;
   }
 }
 
-.row:active {
+.row:active,
+.back:active {
   background: var(--pressed);
+}
+
+.back:active,
+.site-footer .label a:active {
+  color: var(--text);
+}
+
+.inline-app:active {
+  color: var(--text-2);
+}
+
+.prose :where(a):active {
+  text-decoration-color: currentColor;
 }
 
 /* ---- Intro reveal (once per session, see Layout.astro) ----------------- */
@@ -861,7 +844,7 @@ html[data-intro] .reveal {
 /* One curve for both pages, so together they always add up to a whole page: no dip to black. */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 240ms;
+  animation-duration: var(--page-fade);
   animation-timing-function: var(--ease-out);
 }
 
@@ -878,10 +861,39 @@ html[data-intro] .reveal {
   animation-timing-function: var(--ease-out);
 }
 
-/* iPhone Safari paints under its bars, beyond what a page snapshot covers; there only icons and titles travel. */
+/* iPhone Safari paints under its bars, beyond what a page snapshot covers, so there the live pages cross-fade
+   instead (navigation.ts) and only icons and titles are snapshots. */
 @supports (-webkit-touch-callout: none) {
   :root {
     view-transition-name: none;
+  }
+}
+
+/* The page being left: absolute rather than fixed so it also paints under Safari's bars. */
+.page-leaving {
+  position: absolute;
+  z-index: 1;
+  inset-inline: 0;
+  pointer-events: none;
+}
+
+.page-leaving.is-fading {
+  animation: page-out var(--page-fade) var(--ease-out) forwards;
+}
+
+.page-arriving {
+  animation: page-in var(--page-fade) var(--ease-out);
+}
+
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
   }
 }
 
@@ -901,18 +913,6 @@ html[data-intro] .reveal {
 
 @media (prefers-reduced-motion: reduce) {
   html[data-intro] .reveal {
-    animation: none;
-  }
-
-  .row,
-  .pill,
-  .arrow,
-  .back,
-  .back-arrow,
-  .pile-card,
-  .tile .squircle,
-  .tile-name,
-  .skip-link {
     animation: none;
   }
 

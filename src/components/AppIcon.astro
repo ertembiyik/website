@@ -7,7 +7,6 @@ interface Props {
   alt?: string;
   /** Rendered size in CSS pixels. Sets the intrinsic size to avoid layout shift. */
   size: number;
-  class?: string;
   /** Static view-transition name (detail pages, where the element is unique). */
   transitionName?: string;
   /** Candidate name on the index; Layout assigns it at navigation time to the link that was used. */
@@ -15,15 +14,7 @@ interface Props {
   loading?: "eager" | "lazy";
 }
 
-const {
-  src,
-  alt = "",
-  size,
-  class: className,
-  transitionName,
-  morph,
-  loading = "lazy",
-} = Astro.props;
+const { src, alt = "", size, transitionName, morph, loading = "lazy" } = Astro.props;
 
 // Always request the same variants (56/112/168px) no matter the rendered size, so an icon a
 // list row already loaded is cached when its detail page morphs it larger. Eager icons decode
@@ -33,7 +24,7 @@ const decoding = loading === "eager" ? "sync" : "async";
 ---
 
 <span
-  class:list={["squircle", className]}
+  class="squircle"
   style={{
     "--size": `${size}px`,
     ...(transitionName ? { viewTransitionName: transitionName } : {}),

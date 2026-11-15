@@ -19,7 +19,9 @@ function twinOf(requestUrl: string): string {
 
 export async function negotiate(request: Request, assets: Assets): Promise<Response> {
   const isRead = request.method === "GET" || request.method === "HEAD";
-  if (!isRead || !prefersMarkdown(request.headers.get("Accept"))) {
+  // A twin (…/index.md) is already Markdown; looking for its own twin would cost a 404 fetch first.
+  const isTwin = new URL(request.url).pathname.endsWith(".md");
+  if (!isRead || isTwin || !prefersMarkdown(request.headers.get("Accept"))) {
     return assets.fetch(request);
   }
 

@@ -10,7 +10,8 @@
 
 # Pages answer `Accept: text/markdown` with their Markdown twin (worker/negotiate.ts), so caches must
 # key both variants on Accept. Covers the HTML page and its index.md.
-# Fresh for Chrome's 5-minute prefetch window, so a prefetched page answers the router's fetch() without the network.
+# Fresh for 5 minutes: long enough for a prefetched page to answer the router's fetch(), short enough that a deploy
+# reaches open tabs within minutes.
 /
   Vary: Accept
   Cache-Control: public, max-age=300

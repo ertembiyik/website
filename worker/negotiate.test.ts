@@ -40,6 +40,22 @@ describe("worker", () => {
     expect(response.status).toBe(304);
   });
 
+  test("serves a twin requested directly in one asset fetch", async () => {
+    const fetched: string[] = [];
+    const counting: Assets = {
+      fetch: (request) => {
+        fetched.push(new URL(request.url).pathname);
+        return assets.fetch(request);
+      },
+    };
+    const response = await negotiate(
+      new Request("https://example.test/work/pool/index.md", { headers: { Accept: "text/markdown" } }),
+      counting,
+    );
+    expect(await response.text()).toBe("# Pool\n");
+    expect(fetched).toEqual(["/work/pool/index.md"]);
+  });
+
   test("falls back to the page when no twin exists", async () => {
     const response = await get("/missing/", { Accept: "text/markdown" });
     expect(response.status).toBe(404);

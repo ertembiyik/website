@@ -1,6 +1,6 @@
 {
   "name": "website",
-  "compatibility_date": "2026-08-14",
+  "compatibility_date": "2026-11-04",
   // Production lives on ertembiyik.com only; the workers.dev copy would be a second, indexable
   // site that skips the zone's rules. Per-version preview URLs stay on for pull requests.
   "workers_dev": false,
@@ -16,6 +16,7 @@
   },
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1
+    "head_sampling_rate": 1,
+    "traces": { "enabled": true }
   }
 }

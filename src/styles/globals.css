@@ -18,6 +18,7 @@
 
   --ease-out: cubic-bezier(0.165, 0.84, 0.44, 1);
   --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1); /* the iOS navigation curve */
 }
 
 @media (min-resolution: 2dppx) {
@@ -857,21 +858,22 @@ html[data-intro] .reveal {
 
 /* ---- View transitions --------------------------------------------------- */
 
-/* The outgoing page leaves faster than the incoming one arrives, so the two
-   never read as a flash of two overlapping documents. */
+/* Fade through: the old page is nearly gone before the new one starts, so they never print over each other. */
 ::view-transition-old(root) {
   animation-duration: 140ms;
-  animation-timing-function: ease;
+  animation-timing-function: var(--ease-out);
 }
 
 ::view-transition-new(root) {
-  animation-duration: 240ms;
+  animation-duration: 220ms;
+  animation-delay: 60ms;
   animation-timing-function: var(--ease-out);
 }
 
+/* The iOS curve eases in rather than jumping a fifth of the way on frame one; navigation.ts runs it as a scale. */
 ::view-transition-group(*) {
   animation-duration: 280ms;
-  animation-timing-function: var(--ease-out);
+  animation-timing-function: var(--ease-ios);
 }
 
 /* ---- Small screens ------------------------------------------------------ */
@@ -901,11 +903,13 @@ html[data-intro] .reveal {
   .pile-card,
   .tile .squircle,
   .tile-name,
-  .skip-link,
-
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
+  .skip-link {
     animation: none;
+  }
+
+  /* Pages cross-fade whole and nothing travels; !important beats the names set inline. */
+  .morph,
+  .squircle {
+    view-transition-name: none !important;
   }
 }

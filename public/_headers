@@ -10,16 +10,22 @@
 
 # Pages answer `Accept: text/markdown` with their Markdown twin (worker/negotiate.ts), so caches must
 # key both variants on Accept. Covers the HTML page and its index.md.
+# Fresh for Chrome's 5-minute prefetch window, so a prefetched page answers the router's fetch() without the network.
 /
   Vary: Accept
+  Cache-Control: public, max-age=300
 /index.md
   Vary: Accept
+  Cache-Control: public, max-age=300
 /work/*
   Vary: Accept
+  Cache-Control: public, max-age=300
 /projects/*
   Vary: Accept
+  Cache-Control: public, max-age=300
 /speaking/*
   Vary: Accept
+  Cache-Control: public, max-age=300
 
 # Assets serve .txt and .md without a charset, and both carry em dashes and arrows.
 /llms.txt

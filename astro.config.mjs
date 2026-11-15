@@ -14,8 +14,6 @@ export default defineConfig({
   build: {
     inlineStylesheets: 'always',
   },
-  prefetch: {
-    prefetchAll: true,
-    defaultStrategy: 'viewport',
-  },
+  // src/scripts/navigation.ts prefetches pages itself, with the request the client router sends.
+  prefetch: false,
 });

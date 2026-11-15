@@ -99,34 +99,7 @@ const fontFaces = `
     <slot />
 
     <script>
-      // The index can link to one entry from several places (the intro sentence and its row).
-      // View-transition names must be unique per page, so they are assigned at navigation time to
-      // the link the reader actually used: set when leaving the index, and restored on the same
-      // link when coming back. Detail pages carry their names statically.
-      const KEY = "morph-scope";
-      let cameFrom = "";
-
-      function nameOnly(link: Element | null) {
-        for (const el of document.querySelectorAll<HTMLElement>("[data-morph]")) {
-          el.style.viewTransitionName = link?.contains(el) ? (el.dataset.morph ?? "") : "";
-        }
-      }
-
-      document.addEventListener("astro:before-preparation", (event) => {
-        cameFrom = event.from.pathname.replace(/\/$/, "");
-        const link = event.sourceElement?.closest("a[data-morph-scope]");
-        if (!(link instanceof HTMLAnchorElement)) return;
-        sessionStorage.setItem(KEY, `${link.dataset.morphScope}:${link.getAttribute("href")}`);
-        nameOnly(link);
-      });
-
-      document.addEventListener("astro:after-swap", () => {
-        const links = document.querySelectorAll<HTMLAnchorElement>(`a[data-morph-scope][href="${cameFrom}"]`);
-        if (links.length === 0) return;
-        const saved = sessionStorage.getItem(KEY);
-        const used = Array.from(links).find((link) => `${link.dataset.morphScope}:${cameFrom}` === saved);
-        nameOnly(used ?? links[links.length - 1]);
-      });
+      import "../scripts/navigation";
     </script>
   </body>
 </html>

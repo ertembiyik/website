@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/favicon.png" alt="website icon" width="96" />
+  <img src=".github/assets/garland.gif" alt="The flower garland from ertembiyik.com: ASCII flowers swaying in the wind, with bees and butterflies" width="100%" />
 </p>
 
 <h1 align="center">Website</h1>
@@ -20,7 +20,7 @@
 ## Getting Started
 
 Requirements:
-- Bun 1.3+
+- Bun 1.4+
 - Cloudflare account and Wrangler authentication for preview and deploy
 
 Install dependencies and start local development:

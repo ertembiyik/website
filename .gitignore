@@ -9,7 +9,8 @@ worker/worker-configuration.d.ts
 node_modules/
 
 # local tooling state
-.claude/
+.claude/*
+!.claude/settings.json
 .conductor/
 .wrangler/
 

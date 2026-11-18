@@ -12,7 +12,7 @@ links:
   - label: X
     url: https://x.com/hapticshq
 icon: ../../assets/icons/haptics.png
-order: 7
+order: 8
 ---
 
 

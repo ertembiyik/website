@@ -6,7 +6,7 @@ links:
   - label: Raycast Store
     url: https://www.raycast.com/red.avtovo/punto
 icon: ../../assets/icons/punto.png
-order: 6
+order: 7
 ---
 
 

@@ -6,7 +6,7 @@ links:
   - label: Raycast Store
     url: https://www.raycast.com/ertem_biyik/codex-dictation
 icon: ../../assets/icons/codex-dictation.png
-order: 4
+order: 5
 ---
 
 

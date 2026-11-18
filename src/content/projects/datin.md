@@ -8,7 +8,7 @@ links:
   - label: GitHub
     url: https://github.com/datinai/cli
 icon: ../../assets/icons/datin.svg
-order: 2
+order: 3
 ---
 
 

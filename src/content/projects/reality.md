@@ -8,7 +8,7 @@ links:
   - label: X
     url: https://x.com/therealityapp
 icon: ../../assets/icons/reality.png
-order: 8
+order: 9
 ---
 
 

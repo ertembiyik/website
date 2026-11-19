@@ -12,4 +12,4 @@ order: 2
 
 A Telegram CLI made for agents. It syncs your chats into a local cache, so an agent can search them, run SQL over them and reply
 
-I added call history, Markdown formatting, voice notes transcribed with a local Whisper, and editing, forwarding and pinning messages
+I added structured errors and next steps for agents, call history, Markdown formatting, voice notes transcribed with a local Whisper, and editing, forwarding and pinning messages

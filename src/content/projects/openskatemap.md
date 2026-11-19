@@ -1,7 +1,7 @@
 ---
 title: OpenSkateMap
 year: "2026"
-summary: An open skate map, curated by local skaters. Open source
+summary: An open skate map, curated by local skaters
 links:
   - label: openskatemap.app
     url: https://openskatemap.app

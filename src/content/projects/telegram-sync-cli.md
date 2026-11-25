@@ -1,6 +1,6 @@
 ---
 title: Telegram Sync CLI
-year: 2026 – now
+year: "2026"
 summary: Lets AI agents read and write your Telegram from the terminal
 links:
   - label: GitHub

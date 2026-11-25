@@ -6,7 +6,7 @@ links:
   - label: GitHub
     url: https://github.com/neoromantic/telegram-sync-cli
 icon: ../../assets/icons/telegram-sync-cli.svg
-order: 2
+order: 3
 ---
 
 
